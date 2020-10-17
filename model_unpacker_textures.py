@@ -547,7 +547,7 @@ def write_fbx(faces_data, verts_data, name):
         os.mkdir(f'C:/d2_model_temp/texture_models/{name[:8]}/')
     except:
         pass
-    fb.export(save_path=f'C:/d2_model_temp/texture_models/{name[:8]}/{name}.fbx')
+    fb.export(save_path=f'C:/d2_model_temp/texture_models/{name[:8]}/{name}.fbx', ascii_format=True)
 
 
 def write_obj(obj_strings, hsh):
@@ -595,4 +595,4 @@ if __name__ == '__main__':
     all_file_info = {x[0]: dict(zip(['RefID', 'RefPKG', 'FileType'], x[1:])) for x in
                      pkg_db.get_entries_from_table('Everything', 'FileName, RefID, RefPKG, FileType')}
 
-    get_model('B6D4F680', all_file_info, ginsor_debug=False)
+    get_model('0A34ED80', all_file_info, ginsor_debug=False)
