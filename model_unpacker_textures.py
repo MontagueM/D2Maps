@@ -2,7 +2,6 @@ import struct
 import pkg_db
 from dataclasses import dataclass, fields
 import numpy as np
-import binascii
 import os
 import fbx
 import pyfbx as pfb
@@ -169,8 +168,6 @@ def get_verts_faces_data(model_data_file, all_file_info, model_file):
             entry_type = submeshes_entries[i][j].EntryType
             if entry_type == 769 or entry_type == 770:
                 submeshes_verts[i].append(trim_verts_data(all_verts_data[i], faces))
-            # elif submeshes_entries[i][j].EntryType == 770:
-            #     submeshes_verts[i].append(trim_verts_data(all_verts_data[i], faces))
 
 
 
@@ -250,11 +247,6 @@ def get_faces_verts_files(model_data_file):
 
 
 def separate_submeshes_remove_lods(model_data_hex, all_faces_data):
-    """
-    If entry is a submesh, I believe the range is just from Offset to Offset + FacesLength, where FacesLength/3 is the number of final faces
-    If entry is LOD, range is the same where FacesLength/3 is the number of removed faces.
-    Hence, we can pull all the stuff we want out by just separating [Offset:Offset + FacesLength]
-    """
     unk_entries_count = int(gf.get_flipped_hex(model_data_hex[80*2:80*2 + 8], 4), 16)
     unk_entries_offset = 96
 
@@ -290,7 +282,6 @@ def get_faces_data(faces_file, all_file_info):
     ref_file = f"{all_file_info[faces_file.name]['RefPKG'][2:]}-{all_file_info[faces_file.name]['RefID'][2:]}"
     ref_pkg_name = gf.get_pkg_name(ref_file)
     ref_file_type = all_file_info[ref_file]['FileType']
-    # ref_pkg_name, ref_file, ref_file_type = get_referenced_file(faces_file)
     faces = []
     if ref_file_type == "Faces Header":
         faces_hex = gf.get_hex_data(f'{test_dir}/{ref_pkg_name}/{ref_file}.bin')
@@ -332,19 +323,16 @@ def get_verts_data(verts_file, all_file_info):
     ref_file = f"{all_file_info[verts_file.name]['RefPKG'][2:]}-{all_file_info[verts_file.name]['RefID'][2:]}"
     ref_pkg_name = gf.get_pkg_name(ref_file)
     ref_file_type = all_file_info[ref_file]['FileType']
-    # ref_pkg_name, ref_file, ref_file_type = get_referenced_file(verts_file)
     if ref_file_type == "Stride Header":
         stride_header = verts_file.header
 
         stride_hex = gf.get_hex_data(f'{test_dir}/{ref_pkg_name}/{ref_file}.bin')
 
-        # print(stride_header.StrideLength)
         hex_data_split = [stride_hex[i:i + stride_header.StrideLength * 2] for i in
                           range(0, len(stride_hex), stride_header.StrideLength * 2)]
     else:
         print(f'Verts: Incorrect type of file {ref_file_type} for ref file {ref_file} verts file {verts_file}')
         return None
-    # print(verts_file.name)
 
     if stride_header.StrideLength == 4:
         """
@@ -417,7 +405,6 @@ def get_coords_8(hex_data_split):
     coords = []
     for hex_data in hex_data_split:
         coord = []
-        # magic, magic_negative = get_float16(hex_data[12:16], 0)
         for j in range(3):
             flt = get_float16(hex_data, j, is_uv=False)
             coord.append(flt)
@@ -429,7 +416,6 @@ def get_coords_16(hex_data_split):
     coords = []
     for hex_data in hex_data_split:
         coord = []
-        # magic, magic_negative = get_float16(hex_data[12:16], 0)
         for j in range(2):
             flt = get_float16(hex_data, j, is_uv=False)
             coord.append(flt)
@@ -484,31 +470,19 @@ def get_obj_str(faces_data, verts_data, ginsor_debug):
     vts = []
     verts_str = ''
     for coord in verts_data:
-        # if coord[-1] == 0.3535:
-        #     coord = [round(x*(1/0.3535), 4) for x in coord]
         if ginsor_debug:
-            # print('aaa')
             verts_str += f'v {-coord[0]} {coord[2]} {coord[1]}\n'
         else:
-            # print('bbb')
             verts_str += f'v {coord[0]} {coord[1]} {coord[2]}\n'
-        # print(coord)
         if len(coord) > 3:
             vts.append(coord[3:6])
             vns.append(coord[6:9])
-            # vts.append(coord)
-            # vns.append(coord)
     for coord in vts:
         if coord:
             verts_str += f'vt {coord[0]} {coord[1]}\n'
-        # verts_str += f'vt {coord[3:]}\n'
-        # verts_str += f'vt \n'
     for coord in vns:
         if coord:
             verts_str += f'vn {coord[0]} {coord[1]} {coord[2]}\n'
-        # print(coord)
-        # print(np.sqrt(coord[5][0]**2 + coord[6][0]**2 + coord[7][0]**2))
-        # verts_str += f'vn {coord[3:]}\n'
     faces_str = ''
     for face in faces_data:
         if ginsor_debug:
@@ -520,15 +494,11 @@ def get_obj_str(faces_data, verts_data, ginsor_debug):
 
 def write_fbx(faces_data, verts_data, name):
     controlpoints = [fbx.FbxVector4(x[0], x[1], x[2]) for x in verts_data]
-    # manager = Manager()
-    # manager.create_scene(name)
     fb = pfb.FBox()
     fb.create_node()
 
     mesh = fbx.FbxMesh.Create(fb.scene, name)
 
-    # for vert in verts_data:
-        # fb.create_mesh_controlpoint(vert[0], vert[1], vert[2])
     controlpoint_count = len(controlpoints)
     mesh.InitControlPoints(controlpoint_count)
     for i, p in enumerate(controlpoints):
