@@ -52,3 +52,10 @@ def get_pkg_name(file):
         print(f'Could not find folder for {file}. File is likely not a model or folder does not exist.')
         return None
     return pkg_name
+
+
+def mkdir(path):
+    try:
+        os.mkdir(path)
+    except FileExistsError:
+        pass

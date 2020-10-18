@@ -75,19 +75,19 @@ def get_model(model_file_hash, all_file_info, ginsor_debug=False):
     model_file = gf.get_file_from_hash(model_file_hash)
     model_data_file = get_model_data_file(model_file)
     print(f'1: {model_file} 2: {model_data_file}')
-    submeshes_verts, submeshes_faces = get_verts_faces_data(model_data_file, all_file_info, model_file)
+    pos_verts, uv_verts, faces = get_verts_faces_data(model_data_file, all_file_info, model_file)
     obj_strings = []
     max_vert_used = 0
-    for index_2 in range(len(submeshes_verts.keys())):
-        for index_3 in range(len(submeshes_verts[index_2])):
-            adjusted_faces_data, max_vert_used = adjust_faces_data(submeshes_faces[index_2][index_3], max_vert_used)
+    for index_2 in range(len(pos_verts.keys())):
+        for index_3 in range(len(pos_verts[index_2])):
+            adjusted_faces_data, max_vert_used = adjust_faces_data(faces[index_2][index_3], max_vert_used)
             obj_str = f'o {model_file_hash}_0_{index_2}_{index_3}\n'  # separated obj
             shifted_faces = shift_faces_down(adjusted_faces_data)
-            obj_str += get_obj_str(adjusted_faces_data, submeshes_verts[index_2][index_3], ginsor_debug)  # replace with obj_str = for separated obj, otherwise verts_str, faces_str = for joined obj
+            obj_str += get_obj_str(adjusted_faces_data, pos_verts[index_2][index_3], uv_verts[index_2][index_3], ginsor_debug)  # replace with obj_str = for separated obj, otherwise verts_str, faces_str = for joined obj
             obj_strings.append(obj_str)  # separated obj
             # all_verts_str += verts_str  # joined obj
             # all_faces_str += faces_str  # joined obj
-            write_fbx(shifted_faces, submeshes_verts[index_2][index_3], f'{model_file_hash}_0_{index_2}_{index_3}')
+            write_fbx(shifted_faces, pos_verts[index_2][index_3], f'{model_file_hash}_0_{index_2}_{index_3}', ginsor_debug)
             write_obj(obj_str, f'{model_file_hash}_0_{index_2}_{index_3}')
     # obj_strings = f'o {model_file_hash}\n' + all_verts_str + all_faces_str  # joined obj
     write_obj(obj_strings, model_file_hash)
@@ -128,7 +128,7 @@ def get_verts_faces_data(model_data_file, all_file_info, model_file):
     all_faces_data = []
     all_pos_verts_data = []
     all_uv_verts_data = []
-    all_verts_data = []
+    # all_verts_data = []
     faces_files, pos_verts_files, uv_verts_files, model_data_hex = get_faces_verts_files(model_data_file)
     if not faces_files or not pos_verts_files:
         return None, None
@@ -139,9 +139,9 @@ def get_verts_faces_data(model_data_file, all_file_info, model_file):
             return None, None
         pos_verts_data = get_verts_data(pos_verts_file, all_file_info)
         # Even though this may be None it should be okay.
-        uv_verts_data = None
         if len(uv_verts_files) == len(pos_verts_files):
-            uv_verts_file = pos_verts_files[i]
+            # TODO Fix this bug problem thing where no uv file detected
+            uv_verts_file = uv_verts_files[i]
             uv_verts_data = get_verts_data(uv_verts_file, all_file_info)
             all_uv_verts_data.append(uv_verts_data)
         if not pos_verts_data:
@@ -149,29 +149,71 @@ def get_verts_faces_data(model_data_file, all_file_info, model_file):
         if not faces_data:
             return None, None
         all_faces_data.append(faces_data)
-        scaled_pos_verts_data, model_scale = scale_verts(pos_verts_data, model_file)
-        repositioned_scaled_pos_verts_data = reposition_verts(scaled_pos_verts_data, model_scale, model_file)
-        all_pos_verts_data.append(repositioned_scaled_pos_verts_data)
+        repositioned_scaled_pos_verts_data = scale_and_repos_pos_verts(pos_verts_data, model_file)
+        repositioned_scaled_uv_verts_data = scale_and_repos_uv_verts(uv_verts_data, model_file)
+        # all_pos_verts_data.append(repositioned_scaled_pos_verts_data)
         # verts_data = verts_8_data + verts_20_data
-        if uv_verts_data:
-            if len(uv_verts_data) != len(repositioned_scaled_pos_verts_data):
-                verts_data = repositioned_scaled_pos_verts_data
-            else:
-                verts_data = [repositioned_scaled_pos_verts_data[i] + uv_verts_data[i] for i in range(len(repositioned_scaled_pos_verts_data))]
-        else:
-            verts_data = repositioned_scaled_pos_verts_data
-        all_verts_data.append(verts_data)
+        # if uv_verts_data:
+        #     if len(uv_verts_data) != len(repositioned_scaled_pos_verts_data):
+        #         verts_data = repositioned_scaled_pos_verts_data
+        #     else:
+        #         verts_data = [repositioned_scaled_pos_verts_data[i] + uv_verts_data[i] for i in range(len(repositioned_scaled_pos_verts_data))]
+        # else:
+        #     verts_data = repositioned_scaled_pos_verts_data
+        all_pos_verts_data.append(repositioned_scaled_pos_verts_data)
+        print('')
     submeshes_faces, submeshes_entries = separate_submeshes_remove_lods(model_data_hex, all_faces_data)
-    submeshes_verts = {x: [] for x in submeshes_faces.keys()}
+    submeshes_pos_verts = {x: [] for x in submeshes_faces.keys()}
+    submeshes_uv_verts = {x: [] for x in submeshes_faces.keys()}
     for i in submeshes_faces.keys():
         for j, faces in enumerate(submeshes_faces[i]):
             entry_type = submeshes_entries[i][j].EntryType
             if entry_type == 769 or entry_type == 770:
-                submeshes_verts[i].append(trim_verts_data(all_verts_data[i], faces))
+                submeshes_pos_verts[i].append(trim_verts_data(all_pos_verts_data[i], faces))
+                submeshes_uv_verts[i].append(trim_verts_data(all_uv_verts_data[i], faces))
 
 
 
-    return submeshes_verts, submeshes_faces
+    return submeshes_pos_verts, submeshes_uv_verts, submeshes_faces
+
+
+def scale_and_repos_pos_verts(verts_data, model_file):
+    pkg_name = gf.get_pkg_name(model_file)
+    model_hex = gf.get_hex_data(f'{test_dir}/{pkg_name}/{model_file}.bin')
+    scale = struct.unpack('f', bytes.fromhex(model_hex[0x6C*2:0x6C*2 + 8]))[0]
+    for i in range(len(verts_data)):
+        for j in range(3):
+            verts_data[i][j] *= scale
+
+    position_shift = [struct.unpack('f', bytes.fromhex(model_hex[192 + 8 * i:192 + 8 * (i + 1)]))[0] for i in range(3)]
+    for i in range(3):
+        for j in range(len(verts_data)):
+            verts_data[j][i] -= (scale - position_shift[i])
+    return verts_data
+
+
+def scale_and_repos_uv_verts(verts_data, model_file):
+    pkg_name = gf.get_pkg_name(model_file)
+    model_hex = gf.get_hex_data(f'{test_dir}/{pkg_name}/{model_file}.bin')
+    scales = [struct.unpack('f', bytes.fromhex(model_hex[0x70*2+i*8:0x70*2+(i+1)*8]))[0] for i in range(2)]
+    position_shifts = [struct.unpack('f', bytes.fromhex(model_hex[0x78*2+i*8:0x78*2+(i+1)*8]))[0] for i in range(2)]
+    for i in range(len(verts_data)):
+        verts_data[i][0] *= scales[0]
+        verts_data[i][1] *= -scales[1]
+
+    for j in range(len(verts_data)):
+        verts_data[j][0] += (position_shifts[0] - scales[0])
+        verts_data[j][1] += (scales[1] + position_shifts[1])/2
+
+    # Scales are almost 100% correct for sure.
+    a1 = scales[0]
+    a2 = -scales[1]
+    # Probably right (I think so)
+    b1 = (position_shifts[0] - scales[0])
+    # TODO this is def wrong. I think the other stuff is correct though.
+    b2 = (scales[1] + position_shifts[1])/2
+
+    return verts_data
 
 
 def scale_verts(verts_data, model_file):
@@ -242,7 +284,7 @@ def get_faces_verts_files(model_data_file):
                 hf.header = hf.get_header()
                 # print(f'UV file {hf.name} stride {hf.header.StrideLength}')
                 uv_verts_files.append(hf)
-
+    print('uv', [x.name for x in uv_verts_files])
     return faces_files, pos_verts_files, uv_verts_files, model_data_hex
 
 
@@ -299,8 +341,8 @@ def get_faces_data(faces_file, all_file_info):
 
 def get_float16(hex_data, j, is_uv=False):
     flt = get_signed_int(gf.get_flipped_hex(hex_data[j * 4:j * 4 + 4], 4), 16)
-    if j == 1 and is_uv:
-        flt *= -1
+    # if j == 1 and is_uv:
+    #     flt *= -1
     flt = 1 + flt / (2 ** 15 - 1)
     return flt
 
@@ -465,24 +507,21 @@ def trim_verts_data(verts_data, faces_data):
     return verts_data[min(all_v)-1:max(all_v)]
 
 
-def get_obj_str(faces_data, verts_data, ginsor_debug):
-    vns = []
-    vts = []
+def get_obj_str(faces_data, pos_verts_data, uv_verts_data, ginsor_debug):
     verts_str = ''
-    for coord in verts_data:
+    for coord in pos_verts_data:
+        if len(coord) != 3:
+            raise ValueError('pos verts must be of length 3')
         if ginsor_debug:
             verts_str += f'v {-coord[0]} {coord[2]} {coord[1]}\n'
         else:
             verts_str += f'v {coord[0]} {coord[1]} {coord[2]}\n'
-        if len(coord) > 3:
-            vts.append(coord[3:6])
-            vns.append(coord[6:9])
-    for coord in vts:
+    for coord in uv_verts_data:
         if coord:
             verts_str += f'vt {coord[0]} {coord[1]}\n'
-    for coord in vns:
-        if coord:
-            verts_str += f'vn {coord[0]} {coord[1]} {coord[2]}\n'
+    # for coord in vns:
+    #     if coord:
+    #         verts_str += f'vn {coord[0]} {coord[1]} {coord[2]}\n'
     faces_str = ''
     for face in faces_data:
         if ginsor_debug:
@@ -492,9 +531,12 @@ def get_obj_str(faces_data, verts_data, ginsor_debug):
     return verts_str + faces_str  # for sep remove , replace with +
 
 
-def write_fbx(faces_data, verts_data, name):
-    controlpoints = [fbx.FbxVector4(x[0], x[1], x[2]) for x in verts_data]
-    fb = pfb.FBox()
+def write_fbx(faces_data, verts_data, name, ginsor_debug):
+    if ginsor_debug:
+        controlpoints = [fbx.FbxVector4(-x[0], x[2], x[1]) for x in verts_data]
+    else:
+        controlpoints = [fbx.FbxVector4(x[0], x[1], x[2]) for x in verts_data]
+    fb = pfb.Model()
     fb.create_node()
 
     mesh = fbx.FbxMesh.Create(fb.scene, name)
@@ -513,18 +555,12 @@ def write_fbx(faces_data, verts_data, name):
     node = fbx.FbxNode.Create(fb.scene, '')
     node.SetNodeAttribute(mesh)
     fb.scene.GetRootNode().AddChild(node)
-    try:
-        os.mkdir(f'C:/d2_model_temp/texture_models/{name[:8]}/')
-    except:
-        pass
-    fb.export(save_path=f'C:/d2_model_temp/texture_models/{name[:8]}/{name}.fbx', ascii_format=True)
+    gf.mkdir(f'C:/d2_model_temp/texture_models/{name[:8]}/')
+    fb.export(save_path=f'C:/d2_model_temp/texture_models/{name[:8]}/{name}.fbx', ascii_format=False)
 
 
 def write_obj(obj_strings, hsh):
-    try:
-        os.mkdir(f'C:/d2_model_temp/texture_models/{hsh[:8]}/')
-    except FileExistsError:
-        pass
+    gf.mkdir(f'C:/d2_model_temp/texture_models/{hsh[:8]}/')
     with open(f'C:/d2_model_temp/texture_models/{hsh[:8]}/{hsh}.obj', 'w') as f:
         for string in obj_strings:
             f.write(string)
@@ -557,7 +593,8 @@ def extract_textures(model_hash):
         images = [f_hex[offset+16+8+8*(2*i):offset+16+8*(2*i)+16] for i in range(count)]
         for img in images:
             file = gf.get_file_from_hash(img)
-            imager.get_image_from_file(f'C:/d2_output/{gf.get_pkg_name(file)}/{file}.bin', f'C:/d2_model_temp/texture_models/{model_hash}/')
+            gf.mkdir(f'C:/d2_model_temp/texture_models/{model_hash}/textures/')
+            imager.get_image_from_file(f'C:/d2_output/{gf.get_pkg_name(file)}/{file}.bin', f'C:/d2_model_temp/texture_models/{model_hash}/textures/')
 
 
 if __name__ == '__main__':
@@ -565,4 +602,4 @@ if __name__ == '__main__':
     all_file_info = {x[0]: dict(zip(['RefID', 'RefPKG', 'FileType'], x[1:])) for x in
                      pkg_db.get_entries_from_table('Everything', 'FileName, RefID, RefPKG, FileType')}
 
-    get_model('0A34ED80', all_file_info, ginsor_debug=False)
+    get_model('75465881', all_file_info, ginsor_debug=True)

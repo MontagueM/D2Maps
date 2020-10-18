@@ -103,21 +103,12 @@ class Model:
 
         Model.importer.Destroy()
 
-    def export(self, save_path=None, ascii_format=False, scale_100x=True):
+    def export(self, save_path=None, ascii_format=False):
         """Export the scene to an fbx file."""
 
         if not Model.manager.GetIOSettings():
             Model.ios = fbx.FbxIOSettings.Create(Model.manager, fbx.IOSROOT)
             Model.manager.SetIOSettings(Model.ios)
-
-        # if scale_100x:
-        #     Model.system_scale = fbx.FbxSystemUnit(100)
-        #     # Model.system_scale.ConvertScene(Model.scene)
-        #     Model.GlobalSettings = fbx.FbxGlobalSettings.Create(Model.manager, fbx.IOSROOT)
-        #     # new_unit = fbx.FbxSystemUnit()
-        #     Model.GlobalSettings.SetSystemUnit(Model.system_scale)
-        #     Model.GlobalSettings.SetOriginalSystemUnit(Model.system_scale)
-        #     Model.manager.SetGlobalSettings(Model.GlobalSettings)
 
         Model.manager.GetIOSettings().SetBoolProp(fbx.EXP_FBX_MATERIAL, True)
         Model.manager.GetIOSettings().SetBoolProp(fbx.EXP_FBX_TEXTURE, True)

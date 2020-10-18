@@ -4,7 +4,6 @@ import struct
 import model_unpacker_textures as mut
 import scipy.spatial
 import pkg_db
-import os
 import fbx
 import pyfbx as pfb
 import gf
@@ -258,10 +257,7 @@ def rotate_verts(verts_data, rotation_transform, inverse=False):
 
 
 def write_fbx(fbx_map, folder_name, file_name):
-    try:
-        os.mkdir(f'C:/d2_maps/{folder_name}_fbx/')
-    except FileExistsError:
-        pass
+    gf.mkdir(f'C:/d2_maps/{folder_name}_fbx/')
     fbx_map.export(save_path=f'C:/d2_maps/{folder_name}_fbx/{file_name}.fbx', ascii_format=False)
     print('Wrote fbx')
 
@@ -283,4 +279,4 @@ def unpack_folder(pkg_name, ginsor_debug=False, scale_100x=True):
 
 
 if __name__ == '__main__':
-    unpack_folder('city_tower_d2_0369', ginsor_debug=False, scale_100x=True)
+    unpack_folder('city_tower_d2_0369', ginsor_debug=True, scale_100x=True)
