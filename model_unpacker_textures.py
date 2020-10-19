@@ -553,7 +553,7 @@ def write_obj(obj_strings, hsh):
     print('Written to file.')
 
 
-def extract_textures(model_hash):
+def extract_textures(model_hash, custom_dir=None):
     file = gf.get_file_from_hash(model_hash)
     pkg = gf.get_pkg_name(file)
     print(f'{model_hash} mf1 C:/d2_output/{pkg}/{file}.bin')
@@ -579,9 +579,13 @@ def extract_textures(model_hash):
         images = [f_hex[offset+16+8+8*(2*i):offset+16+8*(2*i)+16] for i in range(count)]
         for img in images:
             file = gf.get_file_from_hash(img)
-            gf.mkdir(f'C:/d2_model_temp/texture_models/{model_hash}/textures/')
-            imager.get_image_from_file(f'C:/d2_output/{gf.get_pkg_name(file)}/{file}.bin', f'C:/d2_model_temp/texture_models/{model_hash}/textures/')
-
+            if custom_dir:
+                gf.mkdir(f'{custom_dir}/')
+                imager.get_image_from_file(f'C:/d2_output/{gf.get_pkg_name(file)}/{file}.bin', f'{custom_dir}/')
+            else:
+                gf.mkdir(f'C:/d2_model_temp/texture_models/{model_hash}/textures/')
+                imager.get_image_from_file(f'C:/d2_output/{gf.get_pkg_name(file)}/{file}.bin', f'C:/d2_model_temp/texture_models/{model_hash}/textures/')
+    return images
 
 if __name__ == '__main__':
     pkg_db.start_db_connection()

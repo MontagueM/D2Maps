@@ -68,7 +68,7 @@ def unpack_map(main_file, all_file_info, ginsor_debug, scale_100x, folder_name='
     # else:
     #     return  # LARGE
 
-    fbx_map = compute_coords(transforms_array, all_file_info, fbx_map, ginsor_debug, scale_100x)
+    fbx_map = compute_coords(transforms_array, all_file_info, fbx_map, ginsor_debug, scale_100x, folder_name)
     write_fbx(fbx_map, folder_name, main_file)
 
 
@@ -163,15 +163,19 @@ def get_transforms_array(model_refs, copy_counts, rotations, location, map_scale
     return transforms_array
 
 
-def compute_coords(transforms_array, all_file_info, fbx_map, ginsor_debug, scale_100x):
+def compute_coords(transforms_array, all_file_info, fbx_map, ginsor_debug, scale_100x, folder_name):
     max_vert_used = 0
     nums = 0
-
     for i, transform_array in enumerate(transforms_array):
+        # if i > 0:
+        #     return fbx_map
+        if transform_array[0] != '86BFFE80':
+            continue
         model_file = gf.get_file_from_hash(transform_array[0])
         model_data_file = mut.get_model_data_file(model_file)
-        submeshes_verts, submeshes_faces = mut.get_verts_faces_data(model_data_file, all_file_info, model_file)
-        if not submeshes_verts or not submeshes_faces:
+        pos_verts, uv_verts, faces = mut.get_verts_faces_data(model_data_file, all_file_info, model_file)
+        texture_name_array = mut.extract_textures(transform_array[0], custom_dir=f'C:/d2_maps/{folder_name}_fbx/textures')
+        if not pos_verts or not faces:
             print('Skipping current model')
             continue
         print(f'Getting obj {i + 1}/{len(transforms_array)} {transform_array[0]} {nums}')
@@ -179,22 +183,26 @@ def compute_coords(transforms_array, all_file_info, fbx_map, ginsor_debug, scale
         for copy_id, transform in enumerate(transform_array[1]):
             nums += 1
             # TODO NOTE THERE ARE 6 VERTS PACKED AS IT IS POSX,POSY,POSZ,UV1,UV2,UV3???
-            all_index_2_verts = []
-            [[[all_index_2_verts.append(z) for z in y] for y in x] for x in submeshes_verts.values()]
+            all_index_2_pos_verts = []
+            [[[all_index_2_pos_verts.append(z) for z in y] for y in x] for x in pos_verts.values()]
 
-            r_verts_data = rotate_verts(all_index_2_verts, transform['rotation'])
+            all_index_2_uv_verts = []
+            [[[all_index_2_uv_verts.append(z) for z in y] for y in x] for x in uv_verts.values()]
+
+            r_verts_data = rotate_verts(all_index_2_pos_verts, transform['rotation'])
             map_scaled_verts = get_map_scaled_verts(r_verts_data, transform['map_scaler'])
             map_moved_verts = get_map_moved_verts(map_scaled_verts, transform['location'], scale_100x)
 
             offset = 0
-            for index_2 in submeshes_verts.keys():
-                for index_3 in range(len(submeshes_verts[index_2])):
-                    new_verts = map_moved_verts[offset:offset + len(submeshes_verts[index_2][index_3])]
-                    offset += len(submeshes_verts[index_2][index_3])
-                    adjusted_faces_data, max_vert_used = mut.adjust_faces_data(submeshes_faces[index_2][index_3],
+            for index_2 in pos_verts.keys():
+                for index_3 in range(len(pos_verts[index_2])):
+                    new_pos_verts = map_moved_verts[offset:offset + len(pos_verts[index_2][index_3])]
+                    new_uv_verts = all_index_2_uv_verts[offset:offset + len(pos_verts[index_2][index_3])]
+                    offset += len(pos_verts[index_2][index_3])
+                    adjusted_faces_data, max_vert_used = mut.adjust_faces_data(faces[index_2][index_3],
                                                                                           max_vert_used)
                     shifted_faces = shift_faces_down(adjusted_faces_data)
-                    fbx_map = add_model_to_fbx_map(fbx_map, shifted_faces, new_verts, f'{transform_array[0]}_{copy_id}_{index_2}_{index_3}')
+                    fbx_map = add_model_to_fbx_map(fbx_map, shifted_faces, new_pos_verts, new_uv_verts, texture_name_array[0], f'{transform_array[0]}_{copy_id}_{index_2}_{index_3}', folder_name)
     return fbx_map
 
 
@@ -226,11 +234,29 @@ def shift_faces_down(faces_data):
     return faces_data
 
 
-def add_model_to_fbx_map(fbx_map, faces_data, verts_data, name):
+def add_model_to_fbx_map(fbx_map, faces_data, pos_verts_data, uv_verts_data, diffuse, name, folder_name):
+
+    # controlpoint_count = len(controlpoints)
+    # mesh.InitControlPoints(controlpoint_count)
+    node, mesh = create_mesh(fbx_map, pos_verts_data, faces_data, name)
+
+    layer = mesh.GetLayer(0)
+    if not layer:
+        mesh.CreateLayer()
+    layer = mesh.GetLayer(0)
+
+    node = apply_diffuse(fbx_map, diffuse, folder_name, node)
+
+    layer = create_uv(mesh, name, uv_verts_data, layer)
+
+    fbx_map.scene.GetRootNode().AddChild(node)
+
+    return fbx_map
+
+
+def create_mesh(fbx_map, pos_verts_data, faces_data, name):
     mesh = fbx.FbxMesh.Create(fbx_map.scene, name)
-    controlpoints = [fbx.FbxVector4(x[0], x[1], x[2]) for x in verts_data]
-    controlpoint_count = len(controlpoints)
-    mesh.InitControlPoints(controlpoint_count)
+    controlpoints = [fbx.FbxVector4(x[0], x[1], x[2]) for x in pos_verts_data]
     for i, p in enumerate(controlpoints):
         mesh.SetControlPointAt(p, i)
     for face in faces_data:
@@ -242,9 +268,45 @@ def add_model_to_fbx_map(fbx_map, faces_data, verts_data, name):
 
     node = fbx.FbxNode.Create(fbx_map.scene, name)
     node.SetNodeAttribute(mesh)
-    fbx_map.scene.GetRootNode().AddChild(node)
 
-    return fbx_map
+    return node, mesh
+
+
+def apply_diffuse(fbx_map, tex_name, folder_name, node):
+    lMaterialName = f'mat {tex_name}'
+    lMaterial = fbx.FbxSurfacePhong.Create(fbx_map.scene, lMaterialName)
+    lMaterial.DiffuseFactor.Set(1)
+    node.AddMaterial(lMaterial)
+
+
+    gTexture = fbx.FbxFileTexture.Create(fbx_map.manager, f'Diffuse Texture {tex_name}')
+    lTexPath = f'C:/d2_maps/{folder_name}_fbx/textures/{tex_name}.png'
+    gTexture.SetFileName(lTexPath)
+    gTexture.SetTextureUse(fbx.FbxTexture.eStandard)
+    gTexture.SetMappingType(fbx.FbxTexture.eUV)
+    # gTexture.SetMaterialUse(fbx.FbxTexture.eMODEL_MATERIAL)
+    gTexture.SetSwapUV(False)
+    gTexture.SetTranslation(0.0, 0.0)
+    gTexture.SetScale(1.0, 1.0)
+    gTexture.SetRotation(0.0, 0.0)
+
+    if lMaterial:
+        lMaterial.Diffuse.ConnectSrcObject(gTexture)
+    else:
+        raise RuntimeError('Material broken somewhere')
+
+    return node
+
+
+def create_uv(mesh, name, uv_verts_data, layer):
+    uvDiffuseLayerElement = fbx.FbxLayerElementUV.Create(mesh, f'diffuseUV {name}')
+    uvDiffuseLayerElement.SetMappingMode(fbx.FbxLayerElement.eByControlPoint)
+    uvDiffuseLayerElement.SetReferenceMode(fbx.FbxLayerElement.eDirect)
+    # mesh.InitTextureUV()
+    for i, p in enumerate(uv_verts_data):
+        uvDiffuseLayerElement.GetDirectArray().Add(fbx.FbxVector2(p[0], p[1]))
+    layer.SetUVs(uvDiffuseLayerElement, fbx.FbxLayerElement.eTextureDiffuse)
+    return layer
 
 
 def rotate_verts(verts_data, rotation_transform, inverse=False):
@@ -272,7 +334,7 @@ def unpack_folder(pkg_name, ginsor_debug=False, scale_100x=True):
                      pkg_db.get_entries_from_table('Everything', 'FileName, RefID, RefPKG, FileType')}
     for file_name in file_names:
         if file_name in entries_refpkg.keys():
-            if '1A4A' not in file_name:
+            if '0B3F' not in file_name:
                 continue
             print(f'Unpacking {file_name}')
             unpack_map(file_name,  all_file_info, ginsor_debug, scale_100x, folder_name=pkg_name)
