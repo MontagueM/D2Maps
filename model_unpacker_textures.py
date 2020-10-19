@@ -193,17 +193,24 @@ def scale_and_repos_pos_verts(verts_data, model_file):
 
 
 def scale_and_repos_uv_verts(verts_data, model_file):
+    # return verts_data
     pkg_name = gf.get_pkg_name(model_file)
     model_hex = gf.get_hex_data(f'{test_dir}/{pkg_name}/{model_file}.bin')
     scales = [struct.unpack('f', bytes.fromhex(model_hex[0x70*2+i*8:0x70*2+(i+1)*8]))[0] for i in range(2)]
     position_shifts = [struct.unpack('f', bytes.fromhex(model_hex[0x78*2+i*8:0x78*2+(i+1)*8]))[0] for i in range(2)]
     for i in range(len(verts_data)):
         verts_data[i][0] *= scales[0]
-        verts_data[i][1] *= -scales[1]
+        verts_data[i][1] *= -scales[1]  # without flip
+        # verts_data[i][1] *= scales[1]
+
 
     for j in range(len(verts_data)):
-        verts_data[j][0] += (position_shifts[0] - scales[0])
-        verts_data[j][1] += (scales[1] + position_shifts[1])/2
+        verts_data[j][0] -= (scales[0] - position_shifts[0])
+        print((scales[1] * position_shifts[0]))
+        verts_data[j][1] -= (scales[1] * position_shifts[0])/2
+        # verts_data[j][1] -= (scales[1] - position_shifts[0])
+        # verts_data[j][1] -= (scales[1] + position_shifts[0])  # without flip
+        # verts_data[j][1] -= (scales[1] + position_shifts[1])/2
 
     # Scales are almost 100% correct for sure.
     a1 = scales[0]
@@ -212,27 +219,6 @@ def scale_and_repos_uv_verts(verts_data, model_file):
     b1 = (position_shifts[0] - scales[0])
     # TODO this is def wrong. I think the other stuff is correct though.
     b2 = (scales[1] + position_shifts[1])/2
-
-    return verts_data
-
-
-def scale_verts(verts_data, model_file):
-    pkg_name = gf.get_pkg_name(model_file)
-    model_hex = gf.get_hex_data(f'{test_dir}/{pkg_name}/{model_file}.bin')
-    model_scale = struct.unpack('f', bytes.fromhex(model_hex[0x6C*2:0x6C*2 + 8]))[0]
-    for i in range(len(verts_data)):
-        for j in range(3):
-            verts_data[i][j] *= model_scale
-    return verts_data, model_scale
-
-
-def reposition_verts(verts_data, scale, model_file):
-    pkg_name = gf.get_pkg_name(model_file)
-    model_hex = gf.get_hex_data(f'{test_dir}/{pkg_name}/{model_file}.bin')
-    oneninetwo = [struct.unpack('f', bytes.fromhex(model_hex[192 + 8 * i:192 + 8 * (i + 1)]))[0] for i in range(3)]
-    for i in range(3):
-        for j in range(len(verts_data)):
-            verts_data[j][i] -= (scale - oneninetwo[i])
 
     return verts_data
 
@@ -602,4 +588,7 @@ if __name__ == '__main__':
     all_file_info = {x[0]: dict(zip(['RefID', 'RefPKG', 'FileType'], x[1:])) for x in
                      pkg_db.get_entries_from_table('Everything', 'FileName, RefID, RefPKG, FileType')}
 
+    # 75465881
+    # 74324081
+    # 86BFFE80
     get_model('75465881', all_file_info, ginsor_debug=True)
