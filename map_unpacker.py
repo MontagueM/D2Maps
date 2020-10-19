@@ -169,8 +169,8 @@ def compute_coords(transforms_array, all_file_info, fbx_map, ginsor_debug, scale
     for i, transform_array in enumerate(transforms_array):
         # if i > 0:
         #     return fbx_map
-        if transform_array[0] != '86BFFE80':
-            continue
+        # if transform_array[0] != '86BFFE80':
+        #     continue
         model_file = gf.get_file_from_hash(transform_array[0])
         model_data_file = mut.get_model_data_file(model_file)
         pos_verts, uv_verts, faces = mut.get_verts_faces_data(model_data_file, all_file_info, model_file)
@@ -202,7 +202,12 @@ def compute_coords(transforms_array, all_file_info, fbx_map, ginsor_debug, scale
                     adjusted_faces_data, max_vert_used = mut.adjust_faces_data(faces[index_2][index_3],
                                                                                           max_vert_used)
                     shifted_faces = shift_faces_down(adjusted_faces_data)
-                    fbx_map = add_model_to_fbx_map(fbx_map, shifted_faces, new_pos_verts, new_uv_verts, texture_name_array[0], f'{transform_array[0]}_{copy_id}_{index_2}_{index_3}', folder_name)
+                    # Need to fix the texture name array refs as it wont work for more than the base object
+                    if len(texture_name_array) > 0:
+                        if len(texture_name_array[0]) > 0:
+                            fbx_map = add_model_to_fbx_map(fbx_map, shifted_faces, new_pos_verts, new_uv_verts, texture_name_array[0][0], f'{transform_array[0]}_{copy_id}_{index_2}_{index_3}', folder_name)
+                            continue
+                    fbx_map = add_model_to_fbx_map(fbx_map, shifted_faces, new_pos_verts, new_uv_verts, None, f'{transform_array[0]}_{copy_id}_{index_2}_{index_3}', folder_name)
     return fbx_map
 
 
@@ -239,16 +244,16 @@ def add_model_to_fbx_map(fbx_map, faces_data, pos_verts_data, uv_verts_data, dif
     # controlpoint_count = len(controlpoints)
     # mesh.InitControlPoints(controlpoint_count)
     node, mesh = create_mesh(fbx_map, pos_verts_data, faces_data, name)
+    if diffuse:
+        layer = mesh.GetLayer(0)
+        if not layer:
+            mesh.CreateLayer()
+        layer = mesh.GetLayer(0)
 
-    layer = mesh.GetLayer(0)
-    if not layer:
-        mesh.CreateLayer()
-    layer = mesh.GetLayer(0)
+        node = apply_diffuse(fbx_map, diffuse, folder_name, node)
 
-    node = apply_diffuse(fbx_map, diffuse, folder_name, node)
-
-    layer = create_uv(mesh, name, uv_verts_data, layer)
-
+        layer = create_uv(mesh, diffuse, uv_verts_data, layer)
+        node.SetShadingMode(fbx.FbxNode.eTextureShading)
     fbx_map.scene.GetRootNode().AddChild(node)
 
     return fbx_map
@@ -273,18 +278,21 @@ def create_mesh(fbx_map, pos_verts_data, faces_data, name):
 
 
 def apply_diffuse(fbx_map, tex_name, folder_name, node):
+    # print('applying diffuse', tex_name)
     lMaterialName = f'mat {tex_name}'
     lMaterial = fbx.FbxSurfacePhong.Create(fbx_map.scene, lMaterialName)
     lMaterial.DiffuseFactor.Set(1)
+    lMaterial.ShadingModel.Set('Phong')
     node.AddMaterial(lMaterial)
 
 
-    gTexture = fbx.FbxFileTexture.Create(fbx_map.manager, f'Diffuse Texture {tex_name}')
+    gTexture = fbx.FbxFileTexture.Create(fbx_map.scene, f'Diffuse Texture {tex_name}')
     lTexPath = f'C:/d2_maps/{folder_name}_fbx/textures/{tex_name}.png'
+    # print('tex path', f'C:/d2_maps/{folder_name}_fbx/textures/{tex_name}.png')
     gTexture.SetFileName(lTexPath)
-    gTexture.SetTextureUse(fbx.FbxTexture.eStandard)
-    gTexture.SetMappingType(fbx.FbxTexture.eUV)
-    # gTexture.SetMaterialUse(fbx.FbxTexture.eMODEL_MATERIAL)
+    gTexture.SetTextureUse(fbx.FbxFileTexture.eStandard)
+    gTexture.SetMappingType(fbx.FbxFileTexture.eUV)
+    gTexture.SetMaterialUse(fbx.FbxFileTexture.eModelMaterial)
     gTexture.SetSwapUV(False)
     gTexture.SetTranslation(0.0, 0.0)
     gTexture.SetScale(1.0, 1.0)
@@ -294,7 +302,6 @@ def apply_diffuse(fbx_map, tex_name, folder_name, node):
         lMaterial.Diffuse.ConnectSrcObject(gTexture)
     else:
         raise RuntimeError('Material broken somewhere')
-
     return node
 
 
@@ -334,7 +341,7 @@ def unpack_folder(pkg_name, ginsor_debug=False, scale_100x=True):
                      pkg_db.get_entries_from_table('Everything', 'FileName, RefID, RefPKG, FileType')}
     for file_name in file_names:
         if file_name in entries_refpkg.keys():
-            if '0B3F' not in file_name:
+            if '1A4A' not in file_name:
                 continue
             print(f'Unpacking {file_name}')
             unpack_map(file_name,  all_file_info, ginsor_debug, scale_100x, folder_name=pkg_name)

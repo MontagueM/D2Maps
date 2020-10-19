@@ -144,6 +144,9 @@ def get_verts_faces_data(model_data_file, all_file_info, model_file):
             uv_verts_file = uv_verts_files[i]
             uv_verts_data = get_verts_data(uv_verts_file, all_file_info)
             all_uv_verts_data.append(uv_verts_data)
+        else:
+            uv_verts_data = []
+            all_uv_verts_data.append(uv_verts_data)
         if not pos_verts_data:
             return None, None
         if not faces_data:
@@ -206,7 +209,7 @@ def scale_and_repos_uv_verts(verts_data, model_file):
 
     for j in range(len(verts_data)):
         verts_data[j][0] -= (scales[0] - position_shifts[0])
-        print((scales[1] * position_shifts[0]))
+        # print((scales[1] * position_shifts[0]))
         verts_data[j][1] -= (scales[1] * position_shifts[0])/2
         # verts_data[j][1] -= (scales[1] - position_shifts[0])
         # verts_data[j][1] -= (scales[1] + position_shifts[0])  # without flip
@@ -270,7 +273,7 @@ def get_faces_verts_files(model_data_file):
                 hf.header = hf.get_header()
                 # print(f'UV file {hf.name} stride {hf.header.StrideLength}')
                 uv_verts_files.append(hf)
-    print('uv', [x.name for x in uv_verts_files])
+    # print('uv', [x.name for x in uv_verts_files])
     return faces_files, pos_verts_files, uv_verts_files, model_data_hex
 
 
@@ -556,11 +559,11 @@ def write_obj(obj_strings, hsh):
 def extract_textures(model_hash, custom_dir=None):
     file = gf.get_file_from_hash(model_hash)
     pkg = gf.get_pkg_name(file)
-    print(f'{model_hash} mf1 C:/d2_output/{pkg}/{file}.bin')
+    # print(f'{model_hash} mf1 C:/d2_output/{pkg}/{file}.bin')
     mf1_hex = gf.get_hex_data(f'C:/d2_output/{pkg}/{file}.bin')
     file = gf.get_file_from_hash(mf1_hex[16:24])
     pkg = gf.get_pkg_name(file)
-    print(f'{model_hash} mf2 C:/d2_output/{pkg}/{file}.bin')
+    # print(f'{model_hash} mf2 C:/d2_output/{pkg}/{file}.bin')
     mf2_hex = gf.get_hex_data(f'C:/d2_output/{pkg}/{file}.bin')
     texture_count = int(gf.get_flipped_hex(mf2_hex[80*2:84*2], 8), 16)
     texture_id_entries = [[int(gf.get_flipped_hex(mf2_hex[i:i+4], 4), 16), mf2_hex[i+4:i+8], mf2_hex[i+8:i+12]] for i in range(96*2, 96*2+texture_count*16, 16)]
@@ -569,23 +572,25 @@ def extract_textures(model_hash, custom_dir=None):
     for i, entry in enumerate(texture_id_entries):
         if entry[2] == '7B00':
             relevant_textures[entry[0]] = gf.get_file_from_hash(texture_entries[i])
-    print(relevant_textures)
+    # print(relevant_textures)
+    image_array = []
     for file in list(set(relevant_textures.values())):
         pkg = gf.get_pkg_name(file)
-        print(f'{model_hash} f C:/d2_output/{pkg}/{file}.bin')
+        # print(f'{model_hash} f C:/d2_output/{pkg}/{file}.bin')
         f_hex = gf.get_hex_data(f'C:/d2_output/{pkg}/{file}.bin')
         offset = f_hex.find('11728080')
         count = int(gf.get_flipped_hex(f_hex[offset-16:offset-8], 8), 16)
-        images = [f_hex[offset+16+8+8*(2*i):offset+16+8*(2*i)+16] for i in range(count)]
+        images = [gf.get_file_from_hash(f_hex[offset+16+8+8*(2*i):offset+16+8*(2*i)+16]) for i in range(count)]
+        image_array.append(images)
         for img in images:
-            file = gf.get_file_from_hash(img)
             if custom_dir:
                 gf.mkdir(f'{custom_dir}/')
-                imager.get_image_from_file(f'C:/d2_output/{gf.get_pkg_name(file)}/{file}.bin', f'{custom_dir}/')
+                imager.get_image_from_file(f'C:/d2_output/{gf.get_pkg_name(img)}/{img}.bin', f'{custom_dir}/')
             else:
                 gf.mkdir(f'C:/d2_model_temp/texture_models/{model_hash}/textures/')
-                imager.get_image_from_file(f'C:/d2_output/{gf.get_pkg_name(file)}/{file}.bin', f'C:/d2_model_temp/texture_models/{model_hash}/textures/')
-    return images
+                imager.get_image_from_file(f'C:/d2_output/{gf.get_pkg_name(img)}/{img}.bin', f'C:/d2_model_temp/texture_models/{model_hash}/textures/')
+    return image_array
+
 
 if __name__ == '__main__':
     pkg_db.start_db_connection()
