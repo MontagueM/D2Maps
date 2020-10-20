@@ -2,7 +2,7 @@ import struct
 import pkg_db
 from dataclasses import dataclass, fields
 import numpy as np
-import os
+import os.path
 import fbx
 import pyfbx as pfb
 import gf
@@ -143,17 +143,16 @@ def get_verts_faces_data(model_data_file, all_file_info, model_file):
             # TODO Fix this bug problem thing where no uv file detected
             uv_verts_file = uv_verts_files[i]
             uv_verts_data = get_verts_data(uv_verts_file, all_file_info)
-            all_uv_verts_data.append(uv_verts_data)
         else:
             uv_verts_data = []
-            all_uv_verts_data.append(uv_verts_data)
         if not pos_verts_data:
-            return None, None
+            raise RuntimeError('pos verts not found')
         if not faces_data:
-            return None, None
+            raise RuntimeError('faces not found')
         all_faces_data.append(faces_data)
         repositioned_scaled_pos_verts_data = scale_and_repos_pos_verts(pos_verts_data, model_file)
         repositioned_scaled_uv_verts_data = scale_and_repos_uv_verts(uv_verts_data, model_file)
+        all_uv_verts_data.append(repositioned_scaled_uv_verts_data)
         # all_pos_verts_data.append(repositioned_scaled_pos_verts_data)
         # verts_data = verts_8_data + verts_20_data
         # if uv_verts_data:
@@ -171,11 +170,12 @@ def get_verts_faces_data(model_data_file, all_file_info, model_file):
     for i in submeshes_faces.keys():
         for j, faces in enumerate(submeshes_faces[i]):
             entry_type = submeshes_entries[i][j].EntryType
-            if entry_type == 769 or entry_type == 770:
+            # 769 and 770 are good? 769 def is
+            # 775 is lower LOD
+            # 778 verts load but the faces dont, need to figure that out
+            if entry_type == 769 or entry_type == 770 or entry_type == 778:
                 submeshes_pos_verts[i].append(trim_verts_data(all_pos_verts_data[i], faces))
                 submeshes_uv_verts[i].append(trim_verts_data(all_uv_verts_data[i], faces))
-
-
 
     return submeshes_pos_verts, submeshes_uv_verts, submeshes_faces
 
@@ -293,12 +293,12 @@ def separate_submeshes_remove_lods(model_data_hex, all_faces_data):
     ret_sub_entries = {}
     for e in useful_entries:
         entry = get_header(e, LODSubmeshEntry())
-        # The most likely thing for 770 is that it uses the 20 verts file.
-        if entry.EntryType == 769 or entry.EntryType == 770:
-            submesh_entries.append(entry)
-            if entry.SecondIndexRef not in ret_sub_entries.keys():
-                ret_sub_entries[entry.SecondIndexRef] = []
-            ret_sub_entries[entry.SecondIndexRef].append(entry)
+        # I dont know what each one does.
+        # if entry.EntryType == 769 or entry.EntryType == 770 or entry.EntryType == 775 or entry.EntryType == 778:
+        submesh_entries.append(entry)
+        if entry.SecondIndexRef not in ret_sub_entries.keys():
+            ret_sub_entries[entry.SecondIndexRef] = []
+        ret_sub_entries[entry.SecondIndexRef].append(entry)
 
     submeshes = {}
     for i, e in enumerate(submesh_entries):
@@ -569,27 +569,31 @@ def extract_textures(model_hash, custom_dir=None):
     texture_id_entries = [[int(gf.get_flipped_hex(mf2_hex[i:i+4], 4), 16), mf2_hex[i+4:i+8], mf2_hex[i+8:i+12]] for i in range(96*2, 96*2+texture_count*16, 16)]
     texture_entries = [mf1_hex[i:i+8] for i in range(176*2, 176*2+texture_count*8, 8)]
     relevant_textures = {}
+    image_dict = {}
     for i, entry in enumerate(texture_id_entries):
         if entry[2] == '7B00':
             relevant_textures[entry[0]] = gf.get_file_from_hash(texture_entries[i])
+            image_dict[entry[0]] = []
     # print(relevant_textures)
-    image_array = []
-    for file in list(set(relevant_textures.values())):
+
+    for entry_id, file in relevant_textures.items():
         pkg = gf.get_pkg_name(file)
         # print(f'{model_hash} f C:/d2_output/{pkg}/{file}.bin')
         f_hex = gf.get_hex_data(f'C:/d2_output/{pkg}/{file}.bin')
         offset = f_hex.find('11728080')
         count = int(gf.get_flipped_hex(f_hex[offset-16:offset-8], 8), 16)
         images = [gf.get_file_from_hash(f_hex[offset+16+8+8*(2*i):offset+16+8*(2*i)+16]) for i in range(count)]
-        image_array.append(images)
+        image_dict[entry_id] = images
         for img in images:
             if custom_dir:
                 gf.mkdir(f'{custom_dir}/')
-                imager.get_image_from_file(f'C:/d2_output/{gf.get_pkg_name(img)}/{img}.bin', f'{custom_dir}/')
+                if not os.path.exists(f'{custom_dir}/{img}.png'):
+                    imager.get_image_from_file(f'C:/d2_output/{gf.get_pkg_name(img)}/{img}.bin', f'{custom_dir}/')
             else:
                 gf.mkdir(f'C:/d2_model_temp/texture_models/{model_hash}/textures/')
-                imager.get_image_from_file(f'C:/d2_output/{gf.get_pkg_name(img)}/{img}.bin', f'C:/d2_model_temp/texture_models/{model_hash}/textures/')
-    return image_array
+                if not os.path.exists(f'C:/d2_model_temp/texture_models/{model_hash}/textures/{img}.png'):
+                    imager.get_image_from_file(f'C:/d2_output/{gf.get_pkg_name(img)}/{img}.bin', f'C:/d2_model_temp/texture_models/{model_hash}/textures/')
+    return image_dict
 
 
 if __name__ == '__main__':
@@ -600,4 +604,4 @@ if __name__ == '__main__':
     # 75465881
     # 74324081
     # 86BFFE80
-    get_model('75465881', all_file_info, ginsor_debug=True)
+    get_model('86BFFE80', all_file_info, ginsor_debug=True)

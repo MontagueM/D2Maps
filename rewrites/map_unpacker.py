@@ -254,6 +254,9 @@ def shift_faces_down(faces_data):
 
 
 def add_model_to_fbx_map(fbx_map, faces_data, pos_verts_data, uv_verts_data, diffuse, name, folder_name):
+
+    # controlpoint_count = len(controlpoints)
+    # mesh.InitControlPoints(controlpoint_count)
     node, mesh = create_mesh(fbx_map, pos_verts_data, faces_data, name)
     if diffuse:
         layer = mesh.GetLayer(0)
