@@ -56,10 +56,10 @@ class ModelFile(File):
 
     def get_model_data_file(self):
         self.get_file_from_uid()
-        pkg_name = gf.get_pkg_name(self.name)
+        pkg_name = self.get_pkg_name()
         if not pkg_name:
             raise RuntimeError('Invalid model file given')
-        self.model_file_hex = gf.get_hex_data(f'{test_dir}/{pkg_name}/{self.name}.bin')
+        self.model_file_hex = gf.get_hex_data(f'C:/d2_output/{pkg_name}/{self.name}.bin')
         model_data_hash = self.model_file_hex[16:24]
         return gf.get_file_from_hash(model_data_hash)
 
@@ -99,7 +99,7 @@ class HeaderFile(File):
             if not self.name:
                 self.name = gf.get_file_from_hash(self.uid)
             pkg_name = gf.get_pkg_name(self.name)
-            header_hex = gf.get_hex_data(f'{test_dir}/{pkg_name}/{self.name}.bin')
+            header_hex = gf.get_hex_data(f'C:/d2_output/{pkg_name}/{self.name}.bin')
             return get_header(header_hex, Stride12Header())
 
 
@@ -120,13 +120,11 @@ def get_header(file_hex, header):
     return header
 
 
-test_dir = 'C:/d2_output/'
-
-
 def get_model(model_file_hash):
     print(f'Getting model {model_file_hash}.')
     pkg_db.start_db_connection()
     model_file = ModelFile(model_file_hash)
+    model_file.get_model_data_file()
     get_model_data(model_file)
     get_submeshes(model_file)
     get_materials(model_file)
@@ -136,7 +134,7 @@ def get_model(model_file_hash):
             if submesh.type == 769 or submesh.type == 770 or submesh.type == 778:
                 submesh.faces, max_vert_used = adjust_faces_data(submesh.faces, max_vert_used)
                 submesh.faces = shift_faces_down(submesh.faces)
-                write_fbx(submesh, f'{model_file_hash}_0_{i}_{j}')
+                write_fbx(model_file, submesh, f'{model_file_hash}_0_{i}_{j}')
 
 
 
@@ -144,6 +142,7 @@ def get_model_data(model_file: ModelFile):
     get_model_files(model_file)
     for model in model_file.models:
         model.pos_verts = get_verts_data(model.pos_verts_file)
+        model.uv_verts = get_verts_data(model.uv_verts_file)
         model.pos_verts = scale_and_repos_pos_verts(model.pos_verts, model_file)
         model.uv_verts = scale_and_repos_uv_verts(model.uv_verts, model_file)
         model.faces = get_faces_data(model.faces_file)
@@ -209,7 +208,7 @@ def get_submeshes(model_file: ModelFile):
         submesh.pos_verts = trim_verts_data(model.pos_verts, submesh.faces)
         submesh.uv_verts = trim_verts_data(model.uv_verts, submesh.faces)
         submesh.type = e.EntryType
-        submesh.material = relevant_textures[i]
+        submesh.material = File(name=relevant_textures[i])
         model.submeshes.append(submesh)
 
 
@@ -287,7 +286,7 @@ def get_faces_data(faces_file):
     ref_file_type = all_file_info[ref_file]['FileType']
     faces = []
     if ref_file_type == "Faces Header":
-        faces_hex = gf.get_hex_data(f'{test_dir}/{ref_pkg_name}/{ref_file}.bin')
+        faces_hex = gf.get_hex_data(f'C:/d2_output/{ref_pkg_name}/{ref_file}.bin')
         int_faces_data = [int(gf.get_flipped_hex(faces_hex[i:i+4], 4), 16)+1 for i in range(0, len(faces_hex), 4)]
         for i in range(0, len(int_faces_data), 3):
             face = []
@@ -329,7 +328,7 @@ def get_verts_data(verts_file):
     if ref_file_type == "Stride Header":
         stride_header = verts_file.header
 
-        stride_hex = gf.get_hex_data(f'{test_dir}/{ref_pkg_name}/{ref_file}.bin')
+        stride_hex = gf.get_hex_data(f'C:/d2_output/{ref_pkg_name}/{ref_file}.bin')
 
         hex_data_split = [stride_hex[i:i + stride_header.StrideLength * 2] for i in
                           range(0, len(stride_hex), stride_header.StrideLength * 2)]
@@ -467,10 +466,10 @@ def trim_verts_data(verts_data, faces_data):
     return verts_data[min(all_v)-1:max(all_v)]
 
 
-def write_fbx(submesh, name):
+def write_fbx(model_file: ModelFile, submesh: Submesh, name):
     model = pfb.Model()
     model.create_node()
-    get_submesh_textures(submesh)
+    get_submesh_textures(model_file, submesh)
     node, mesh = create_mesh(model, submesh.pos_verts, submesh.faces, name)
     if submesh.diffuse:
         layer = mesh.GetLayer(0)
@@ -478,33 +477,31 @@ def write_fbx(submesh, name):
             mesh.CreateLayer()
         layer = mesh.GetLayer(0)
 
-        node = apply_diffuse(model, submesh.diffuse, f'C:/d2_model_temp/texture_models/{name[:8]}/textures/{diffuse}.png', node)
+        node = apply_diffuse(model, submesh.diffuse, f'C:/d2_model_temp/texture_models/{model_file.uid}/textures/{submesh.diffuse}.png', node)
 
         layer = create_uv(mesh, submesh.diffuse, submesh.uv_verts, layer)
         node.SetShadingMode(fbx.FbxNode.eTextureShading)
     model.scene.GetRootNode().AddChild(node)
 
-    gf.mkdir(f'C:/d2_model_temp/texture_models/{name[:8]}/')
-    model.export(save_path=f'C:/d2_model_temp/texture_models/{name[:8]}/{name}.fbx', ascii_format=False)
+    gf.mkdir(f'C:/d2_model_temp/texture_models/{model_file.uid}/')
+    model.export(save_path=f'C:/d2_model_temp/texture_models/{model_file.uid}/{name}.fbx', ascii_format=False)
 
 
-def get_submesh_textures(submesh: Submesh):
-    pkg = gf.get_pkg_name(file)
-    # print(f'{model_hash} f C:/d2_output/{pkg}/{file}.bin')
-    f_hex = gf.get_hex_data(f'C:/d2_output/{pkg}/{file}.bin')
+def get_submesh_textures(model_file: ModelFile, submesh: Submesh, custom_dir=False):
+    f_hex = gf.get_hex_data(f'C:/d2_output/{submesh.material.get_pkg_name()}/{submesh.material.name}.bin')
     offset = f_hex.find('11728080')
     count = int(gf.get_flipped_hex(f_hex[offset-16:offset-8], 8), 16)
     images = [gf.get_file_from_hash(f_hex[offset+16+8+8*(2*i):offset+16+8*(2*i)+16]) for i in range(count)]
-    image_dict[entry_id] = images
+    submesh.diffuse = images[0]
     for img in images:
         if custom_dir:
             gf.mkdir(f'{custom_dir}/')
             if not os.path.exists(f'{custom_dir}/{img}.png'):
                 imager.get_image_from_file(f'C:/d2_output/{gf.get_pkg_name(img)}/{img}.bin', f'{custom_dir}/')
         else:
-            gf.mkdir(f'C:/d2_model_temp/texture_models/{model_hash}/textures/')
-            if not os.path.exists(f'C:/d2_model_temp/texture_models/{model_hash}/textures/{img}.png'):
-                imager.get_image_from_file(f'C:/d2_output/{gf.get_pkg_name(img)}/{img}.bin', f'C:/d2_model_temp/texture_models/{model_hash}/textures/')
+            gf.mkdir(f'C:/d2_model_temp/texture_models/{model_file.uid}/textures/')
+            if not os.path.exists(f'C:/d2_model_temp/texture_models/{model_file.uid}/textures/{img}.png'):
+                imager.get_image_from_file(f'C:/d2_output/{gf.get_pkg_name(img)}/{img}.bin', f'C:/d2_model_temp/texture_models/{model_file.uid}/textures/')
 
 
 
