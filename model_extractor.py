@@ -196,8 +196,7 @@ def get_submeshes(model_file: ModelFile):
     actual_submeshes = []
     for e in submesh_entries:
         entry = get_header(e, LODSubmeshEntry())
-        if entry.EntryType == 769 or entry.EntryType == 770 or entry.EntryType == 778:
-            actual_submeshes.append(entry)
+        actual_submeshes.append(entry)
 
     relevant_textures = get_materials(model_file)
 
@@ -208,8 +207,9 @@ def get_submeshes(model_file: ModelFile):
         submesh.pos_verts = trim_verts_data(model.pos_verts, submesh.faces)
         submesh.uv_verts = trim_verts_data(model.uv_verts, submesh.faces)
         submesh.type = e.EntryType
-        submesh.material = File(name=relevant_textures[i])
-        model.submeshes.append(submesh)
+        if i in relevant_textures.keys():
+            submesh.material = File(name=relevant_textures[i])
+            model.submeshes.append(submesh)
 
 
 def get_materials(model_file: ModelFile):
@@ -467,23 +467,23 @@ def trim_verts_data(verts_data, faces_data):
 
 
 def write_fbx(model_file: ModelFile, submesh: Submesh, name):
+    gf.mkdir(f'C:/d2_model_temp/texture_models/{model_file.uid}/')
+
     model = pfb.Model()
-    model.create_node()
-    get_submesh_textures(model_file, submesh)
     node, mesh = create_mesh(model, submesh.pos_verts, submesh.faces, name)
-    if submesh.diffuse:
-        layer = mesh.GetLayer(0)
-        if not layer:
-            mesh.CreateLayer()
-        layer = mesh.GetLayer(0)
+    if submesh.material:
+        get_submesh_textures(model_file, submesh)
+        if submesh.diffuse:
+            if not mesh.GetLayer(0):
+                mesh.CreateLayer()
+            layer = mesh.GetLayer(0)
 
-        node = apply_diffuse(model, submesh.diffuse, f'C:/d2_model_temp/texture_models/{model_file.uid}/textures/{submesh.diffuse}.png', node)
+            apply_diffuse(model, submesh.diffuse, f'C:/d2_model_temp/texture_models/{model_file.uid}/textures/{submesh.diffuse}.png', node)
 
-        layer = create_uv(mesh, submesh.diffuse, submesh.uv_verts, layer)
-        node.SetShadingMode(fbx.FbxNode.eTextureShading)
+            create_uv(mesh, submesh.diffuse, submesh.uv_verts, layer)
+            node.SetShadingMode(fbx.FbxNode.eTextureShading)
     model.scene.GetRootNode().AddChild(node)
 
-    gf.mkdir(f'C:/d2_model_temp/texture_models/{model_file.uid}/')
     model.export(save_path=f'C:/d2_model_temp/texture_models/{model_file.uid}/{name}.fbx', ascii_format=False)
 
 
@@ -571,4 +571,6 @@ if __name__ == '__main__':
     # 75465881
     # 74324081
     # 86BFFE80
-    get_model('86BFFE80')
+
+    """UVs wrong for 2012C780"""
+    get_model('74324081')
