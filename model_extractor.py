@@ -584,4 +584,4 @@ if __name__ == '__main__':
     # 86BFFE80
 
     """UVs wrong for 2012C780"""
-    get_model('74324081')
+    get_model('46F15681')

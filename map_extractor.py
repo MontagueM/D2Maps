@@ -151,7 +151,7 @@ def compute_coords(d2map: Map):
     for i, model_ref in enumerate(d2map.model_refs):
         # if i > 0:
         #     return
-        # if model_ref != 'F622ED80':
+        # if model_ref != '7C23ED80':
         #     continue
         print(f'Getting obj {i + 1}/{len(d2map.model_refs)} {model_ref} {nums}')
 
@@ -159,6 +159,7 @@ def compute_coords(d2map: Map):
         model_file.get_model_data_file()
         ret = met.get_model_data(model_file, all_file_info)
         if not ret:
+            nums += 1
             continue
         met.get_submeshes(model_file)
         met.get_materials(model_file)
@@ -247,8 +248,8 @@ def create_mesh(d2map: Map, submesh: met.Submesh, name):
 
 def apply_diffuse(d2map, submesh, node):
     # print('applying diffuse', tex_name)
-    lMaterialName = f'mat {submesh.diffuse}'
-    if f'mat {submesh.diffuse}' in d2map.materials.keys():
+    lMaterialName = f'mat {submesh.material.name}'
+    if lMaterialName in d2map.materials.keys():
         node.AddMaterial(d2map.materials[lMaterialName])
         return
     lMaterial = fbx.FbxSurfacePhong.Create(d2map.fbx_model.scene, lMaterialName)
@@ -301,7 +302,7 @@ def unpack_folder(pkg_name):
     file_names = sorted(entries_refid.keys(), key=lambda x: entries_size[x])
     for file_name in file_names:
         if file_name in entries_refpkg.keys():
-            if '1A4A' not in file_name:
+            if '0B3F' not in file_name:
                 continue
             print(f'Unpacking {file_name}')
             unpack_map(file_name, pkg_name)
