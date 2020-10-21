@@ -78,6 +78,7 @@ class Model:
 class Submesh:
     def __init__(self):
         self.pos_verts = []
+        self.adjusted_pos_verts = []
         self.uv_verts = []
         self.faces = []
         self.material = None
@@ -138,14 +139,15 @@ def get_model(model_file_hash):
 
 
 
-def get_model_data(model_file: ModelFile):
+def get_model_data(model_file: ModelFile, all_file_info):
     get_model_files(model_file)
     for model in model_file.models:
-        model.pos_verts = get_verts_data(model.pos_verts_file)
-        model.uv_verts = get_verts_data(model.uv_verts_file)
+        model.pos_verts = get_verts_data(model.pos_verts_file, all_file_info)
+        if model.uv_verts_file:
+            model.uv_verts = get_verts_data(model.uv_verts_file, all_file_info)
+            model.uv_verts = scale_and_repos_uv_verts(model.uv_verts, model_file)
         model.pos_verts = scale_and_repos_pos_verts(model.pos_verts, model_file)
-        model.uv_verts = scale_and_repos_uv_verts(model.uv_verts, model_file)
-        model.faces = get_faces_data(model.faces_file)
+        model.faces = get_faces_data(model.faces_file, all_file_info)
     print('')
 
 
@@ -175,8 +177,9 @@ def get_model_files(model_file: ModelFile):
             elif j == 2:
                 if not hf.pkg_name:
                     print('No UV file found')
-                hf.header = hf.get_header()
-                model.uv_verts_file = hf
+                else:
+                    hf.header = hf.get_header()
+                    model.uv_verts_file = hf
         models.append(model)
     model_file.models = models
 
@@ -280,7 +283,7 @@ def scale_and_repos_uv_verts(verts_data, model_file):
     return verts_data
 
 
-def get_faces_data(faces_file):
+def get_faces_data(faces_file, all_file_info):
     ref_file = f"{all_file_info[faces_file.name]['RefPKG'][2:]}-{all_file_info[faces_file.name]['RefID'][2:]}"
     ref_pkg_name = gf.get_pkg_name(ref_file)
     ref_file_type = all_file_info[ref_file]['FileType']
@@ -314,7 +317,7 @@ def get_signed_int(hexstr, bits):
     return value
 
 
-def get_verts_data(verts_file):
+def get_verts_data(verts_file, all_file_info):
     """
     Stride length 48 is a dynamic and physics-enabled object.
     """
@@ -466,7 +469,7 @@ def trim_verts_data(verts_data, faces_data):
     return verts_data[min(all_v)-1:max(all_v)]
 
 
-def write_fbx(model_file: ModelFile, submesh: Submesh, name):
+def export_fbx(model_file: ModelFile, submesh: Submesh, name):
     gf.mkdir(f'C:/d2_model_temp/texture_models/{model_file.uid}/')
 
     model = pfb.Model()
@@ -491,6 +494,9 @@ def get_submesh_textures(model_file: ModelFile, submesh: Submesh, custom_dir=Fal
     f_hex = gf.get_hex_data(f'C:/d2_output/{submesh.material.get_pkg_name()}/{submesh.material.name}.bin')
     offset = f_hex.find('11728080')
     count = int(gf.get_flipped_hex(f_hex[offset-16:offset-8], 8), 16)
+    # Arbritrary
+    if count < 0 or count > 100:
+        return
     images = [gf.get_file_from_hash(f_hex[offset+16+8+8*(2*i):offset+16+8*(2*i)+16]) for i in range(count)]
     submesh.diffuse = images[0]
     for img in images:
