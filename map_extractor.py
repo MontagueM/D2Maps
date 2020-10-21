@@ -29,6 +29,7 @@ class Map(met.File):
         self.copy_counts_hex = ''
         self.copy_counts = []
         self.fbx_model = None
+        self.materials = {}
 
 
 def get_header(file_hex, header):
@@ -150,12 +151,15 @@ def compute_coords(d2map: Map):
     for i, model_ref in enumerate(d2map.model_refs):
         # if i > 0:
         #     return
-
+        # if model_ref != 'F622ED80':
+        #     continue
         print(f'Getting obj {i + 1}/{len(d2map.model_refs)} {model_ref} {nums}')
 
         model_file = met.ModelFile(uid=model_ref)
         model_file.get_model_data_file()
-        met.get_model_data(model_file, all_file_info)
+        ret = met.get_model_data(model_file, all_file_info)
+        if not ret:
+            continue
         met.get_submeshes(model_file)
         met.get_materials(model_file)
 
@@ -244,7 +248,11 @@ def create_mesh(d2map: Map, submesh: met.Submesh, name):
 def apply_diffuse(d2map, submesh, node):
     # print('applying diffuse', tex_name)
     lMaterialName = f'mat {submesh.diffuse}'
+    if f'mat {submesh.diffuse}' in d2map.materials.keys():
+        node.AddMaterial(d2map.materials[lMaterialName])
+        return
     lMaterial = fbx.FbxSurfacePhong.Create(d2map.fbx_model.scene, lMaterialName)
+    d2map.materials[lMaterialName] = lMaterial
     lMaterial.DiffuseFactor.Set(1)
     lMaterial.ShadingModel.Set('Phong')
     node.AddMaterial(lMaterial)
@@ -266,7 +274,6 @@ def apply_diffuse(d2map, submesh, node):
         lMaterial.Diffuse.ConnectSrcObject(gTexture)
     else:
         raise RuntimeError('Material broken somewhere')
-    return node
 
 
 def create_uv(mesh, name, submesh: met.Submesh, layer):

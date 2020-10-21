@@ -140,7 +140,9 @@ def get_model(model_file_hash):
 
 
 def get_model_data(model_file: ModelFile, all_file_info):
-    get_model_files(model_file)
+    ret = get_model_files(model_file)
+    if not ret:
+        return
     for model in model_file.models:
         model.pos_verts = get_verts_data(model.pos_verts_file, all_file_info)
         if model.uv_verts_file:
@@ -148,7 +150,7 @@ def get_model_data(model_file: ModelFile, all_file_info):
             model.uv_verts = scale_and_repos_uv_verts(model.uv_verts, model_file)
         model.pos_verts = scale_and_repos_pos_verts(model.pos_verts, model_file)
         model.faces = get_faces_data(model.faces_file, all_file_info)
-    print('')
+    return True
 
 
 def get_model_files(model_file: ModelFile):
@@ -164,6 +166,8 @@ def get_model_files(model_file: ModelFile):
         faces_hash = gf.get_flipped_hex(relevant_hex[32*i:32*i+8], 8)
         pos_verts_file = gf.get_flipped_hex(relevant_hex[32*i+8:32*i+16], 8)
         uv_verts_file = gf.get_flipped_hex(relevant_hex[32*i+16:32*i+24], 8)
+        if pos_verts_file == '' or faces_hash == '':
+            return
         for j, hsh in enumerate([faces_hash, pos_verts_file, uv_verts_file]):
             hf = HeaderFile()
             hf.uid = gf.get_flipped_hex(hsh, 8)
@@ -182,6 +186,7 @@ def get_model_files(model_file: ModelFile):
                     model.uv_verts_file = hf
         models.append(model)
     model_file.models = models
+    return True
 
 
 def get_submeshes(model_file: ModelFile):
