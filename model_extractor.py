@@ -69,8 +69,9 @@ class Model:
         self.submeshes = []
         self.pos_verts_file = None
         self.pos_verts = []
-        self.uv_verts_file = None
+        self.extra_verts_file = None
         self.uv_verts = []
+        self.norm_verts = []
         self.faces_file = None
         self.faces = []
 
@@ -79,6 +80,7 @@ class Submesh:
     def __init__(self):
         self.pos_verts = []
         self.adjusted_pos_verts = []
+        self.norm_verts = []
         self.uv_verts = []
         self.faces = []
         self.material = None
@@ -126,7 +128,7 @@ def get_model(model_file_hash):
     pkg_db.start_db_connection()
     model_file = ModelFile(model_file_hash)
     model_file.get_model_data_file()
-    get_model_data(model_file)
+    get_model_data(model_file, all_file_info)
     get_submeshes(model_file)
     get_materials(model_file)
     max_vert_used = 0
@@ -135,7 +137,7 @@ def get_model(model_file_hash):
             if submesh.type == 769 or submesh.type == 770 or submesh.type == 778:
                 submesh.faces, max_vert_used = adjust_faces_data(submesh.faces, max_vert_used)
                 submesh.faces = shift_faces_down(submesh.faces)
-                write_fbx(model_file, submesh, f'{model_file_hash}_0_{i}_{j}')
+                export_fbx(model_file, submesh, f'{model_file_hash}_0_{i}_{j}')
 
 
 
@@ -144,11 +146,14 @@ def get_model_data(model_file: ModelFile, all_file_info):
     if not ret:
         return
     for model in model_file.models:
-        model.pos_verts = get_verts_data(model.pos_verts_file, all_file_info)
-        if model.uv_verts_file:
-            model.uv_verts = get_verts_data(model.uv_verts_file, all_file_info)
-            model.uv_verts = scale_and_repos_uv_verts(model.uv_verts, model_file)
+        model.pos_verts = get_verts_data(model.pos_verts_file, all_file_info, is_uv=False)
         model.pos_verts = scale_and_repos_pos_verts(model.pos_verts, model_file)
+
+        if model.extra_verts_file:
+            coords = get_verts_data(model.extra_verts_file, all_file_info, is_uv=True)
+            model.uv_verts = coords[0]
+            model.norm_verts = coords[1]
+            model.uv_verts = scale_and_repos_uv_verts(model.uv_verts, model_file)
         model.faces = get_faces_data(model.faces_file, all_file_info)
     return True
 
@@ -180,10 +185,10 @@ def get_model_files(model_file: ModelFile):
                 model.pos_verts_file = hf
             elif j == 2:
                 if not hf.pkg_name:
-                    print('No UV file found')
+                    print('No extra verts file found')
                 else:
                     hf.header = hf.get_header()
-                    model.uv_verts_file = hf
+                    model.extra_verts_file = hf
         models.append(model)
     model_file.models = models
     return True
@@ -214,6 +219,7 @@ def get_submeshes(model_file: ModelFile):
         submesh.faces = model.faces[int(e.Offset/3):int((e.Offset + e.FacesLength)/3)]
         submesh.pos_verts = trim_verts_data(model.pos_verts, submesh.faces)
         submesh.uv_verts = trim_verts_data(model.uv_verts, submesh.faces)
+        submesh.norm_verts = trim_verts_data(model.norm_verts, submesh.faces)
         submesh.type = e.EntryType
         if i in relevant_textures.keys():
             submesh.material = File(name=relevant_textures[i])
@@ -275,6 +281,7 @@ def scale_and_repos_pos_verts(verts_data, model_file):
 
 
 def scale_and_repos_uv_verts(verts_data, model_file):
+
     scales = [struct.unpack('f', bytes.fromhex(model_file.model_file_hex[0x70*2+i*8:0x70*2+(i+1)*8]))[0] for i in range(2)]
     position_shifts = [struct.unpack('f', bytes.fromhex(model_file.model_file_hex[0x78*2+i*8:0x78*2+(i+1)*8]))[0] for i in range(2)]
     for i in range(len(verts_data)):
@@ -283,7 +290,7 @@ def scale_and_repos_uv_verts(verts_data, model_file):
 
     for j in range(len(verts_data)):
         verts_data[j][0] -= (scales[0] - position_shifts[0])
-        verts_data[j][1] -= (scales[1] * position_shifts[0])/2
+        verts_data[j][1] += (scales[1] - position_shifts[1] + 1)
 
     return verts_data
 
@@ -307,10 +314,8 @@ def get_faces_data(faces_file, all_file_info):
         return None
 
 
-def get_float16(hex_data, j, is_uv=False):
+def get_float16(hex_data, j):
     flt = get_signed_int(gf.get_flipped_hex(hex_data[j * 4:j * 4 + 4], 4), 16)
-    # if j == 1 and is_uv:
-    #     flt *= -1
     flt = 1 + flt / (2 ** 15 - 1)
     return flt
 
@@ -322,7 +327,7 @@ def get_signed_int(hexstr, bits):
     return value
 
 
-def get_verts_data(verts_file, all_file_info):
+def get_verts_data(verts_file, all_file_info, is_uv):
     """
     Stride length 48 is a dynamic and physics-enabled object.
     """
@@ -343,7 +348,7 @@ def get_verts_data(verts_file, all_file_info):
     else:
         print(f'Verts: Incorrect type of file {ref_file_type} for ref file {ref_file} verts file {verts_file}')
         return None
-
+    print(f'stride {stride_header.StrideLength} isuv {is_uv}')
     if stride_header.StrideLength == 4:
         """
         UV info for dynamic, physics-based objects.
@@ -353,16 +358,19 @@ def get_verts_data(verts_file, all_file_info):
         """
         Coord info for static and dynamic, non-physics objects.
         ? info for dynamic, physics-based objects.
+        Can also be uv for some reason
         """
-        coords = get_coords_8(hex_data_split)
+        coords = get_coords_8(hex_data_split, is_uv)
     elif stride_header.StrideLength == 12:
         """
         Coord info takes up same 8 stride, also 2 extra bits.
+        Also UV sometimes? 2 extra bits will be for UV
         """
         # TODO ADD PROPER SUPPORT
-        coords = get_coords_8(hex_data_split)
+        coords = get_coords_12(hex_data_split, is_uv)
     elif stride_header.StrideLength == 16:
         """
+        UV
         """
         coords = get_coords_16(hex_data_split)
     elif stride_header.StrideLength == 20:
@@ -405,21 +413,54 @@ def get_coords_4(hex_data_split):
     for hex_data in hex_data_split:
         coord = []
         for j in range(2):
-            flt = get_float16(hex_data, j, is_uv=True)
+            flt = get_float16(hex_data, j)
             coord.append(flt)
         coords.append(coord)
-    return coords
+    return [coords, []]
 
 
-def get_coords_8(hex_data_split):
+def get_coords_8(hex_data_split, is_uv=False):
+    if is_uv:
+        uvs = []
+        for hex_data in hex_data_split:
+            uv = []
+            for j in range(4):
+                flt = get_float16(hex_data, j)
+                if j % 2 == 0:
+                    uv.append(flt)
+            uvs.append(uv)
+        return [uvs, []]
+    else:
+        coords = []
+        for hex_data in hex_data_split:
+            coord = []
+            for j in range(3):
+                flt = get_float16(hex_data, j)
+                coord.append(flt)
+            coords.append(coord)
+        return coords
+
+
+def get_coords_12(hex_data_split, is_uv):
+    uvs = []
     coords = []
     for hex_data in hex_data_split:
-        coord = []
-        for j in range(3):
-            flt = get_float16(hex_data, j, is_uv=False)
-            coord.append(flt)
-        coords.append(coord)
-    return coords
+        if is_uv:
+            uv = []
+            for j in range(3, 5):
+                flt = get_float16(hex_data, j)
+                uv.append(flt)
+            uvs.append(uv)
+        else:
+            coord = []
+            for j in range(3):
+                flt = get_float16(hex_data, j)
+                coord.append(flt)
+            coords.append(coord)
+    if is_uv:
+        return [uvs, []]
+    else:
+        return coords
 
 
 def get_coords_16(hex_data_split):
@@ -427,21 +468,27 @@ def get_coords_16(hex_data_split):
     for hex_data in hex_data_split:
         coord = []
         for j in range(2):
-            flt = get_float16(hex_data, j, is_uv=False)
+            flt = get_float16(hex_data, j)
             coord.append(flt)
         coords.append(coord)
-    return coords
+    return [coords, []]
 
 
 def get_coords_20(hex_data_split):
-    coords = []
+    uvs = []
+    normals = []
     for hex_data in hex_data_split:
-        coord = []
+        uv = []
+        norm = []
         for j in range(2):
-            flt = get_float16(hex_data, j, is_uv=True)
-            coord.append(flt)
-        coords.append(coord)
-    return coords
+            flt = get_float16(hex_data, j)
+            uv.append(flt)
+        uvs.append(uv)
+        for j in range(2, 5):
+            flt = get_float16(hex_data, j)-1
+            norm.append(flt)
+        normals.append(norm)
+    return [uvs, normals]
 
 
 def get_coords_24(hex_data_split):
@@ -449,10 +496,10 @@ def get_coords_24(hex_data_split):
     for hex_data in hex_data_split:
         coord = []
         for j in range(2):
-            flt = get_float16(hex_data, j, is_uv=True)
+            flt = get_float16(hex_data, j)
             coord.append(flt)
         coords.append(coord)
-    return coords
+    return [coords, []]
 
 
 def get_coords_48(hex_data_split):
@@ -489,10 +536,12 @@ def export_fbx(model_file: ModelFile, submesh: Submesh, name):
             apply_diffuse(model, submesh.diffuse, f'C:/d2_model_temp/texture_models/{model_file.uid}/textures/{submesh.diffuse}.png', node)
 
             create_uv(mesh, submesh.diffuse, submesh.uv_verts, layer)
+            set_normals(mesh, submesh.diffuse, submesh.norm_verts, layer)
             node.SetShadingMode(fbx.FbxNode.eTextureShading)
     model.scene.GetRootNode().AddChild(node)
 
     model.export(save_path=f'C:/d2_model_temp/texture_models/{model_file.uid}/{name}.fbx', ascii_format=False)
+    print('Exported')
 
 
 def get_submesh_textures(model_file: ModelFile, submesh: Submesh, custom_dir=False):
@@ -560,18 +609,24 @@ def apply_diffuse(fbx_map, tex_name, tex_path, node):
         lMaterial.Diffuse.ConnectSrcObject(gTexture)
     else:
         raise RuntimeError('Material broken somewhere')
-    return node
+
+
+def set_normals(mesh, name, normal_verts_data, layer):
+    normalLayerElement = fbx.FbxLayerElementNormal.Create(mesh, f'normals {name}')
+    normalLayerElement.SetMappingMode(fbx.FbxLayerElement.eByControlPoint)
+    normalLayerElement.SetReferenceMode(fbx.FbxLayerElement.eDirect)
+    for i, p in enumerate(normal_verts_data):
+        normalLayerElement.GetDirectArray().Add(fbx.FbxVector4(p[0], p[1], p[2]))
+    layer.SetNormals(normalLayerElement)
 
 
 def create_uv(mesh, name, uv_verts_data, layer):
     uvDiffuseLayerElement = fbx.FbxLayerElementUV.Create(mesh, f'diffuseUV {name}')
     uvDiffuseLayerElement.SetMappingMode(fbx.FbxLayerElement.eByControlPoint)
     uvDiffuseLayerElement.SetReferenceMode(fbx.FbxLayerElement.eDirect)
-    # mesh.InitTextureUV()
     for i, p in enumerate(uv_verts_data):
         uvDiffuseLayerElement.GetDirectArray().Add(fbx.FbxVector2(p[0], p[1]))
     layer.SetUVs(uvDiffuseLayerElement, fbx.FbxLayerElement.eTextureDiffuse)
-    return layer
 
 
 if __name__ == '__main__':
@@ -583,5 +638,5 @@ if __name__ == '__main__':
     # 74324081
     # 86BFFE80
 
-    """UVs wrong for 2012C780"""
-    get_model('46F15681')
+    """UVs wrong for 2012C780, B7BDFE80"""
+    get_model('62CFF680')

@@ -302,7 +302,7 @@ def unpack_folder(pkg_name):
     file_names = sorted(entries_refid.keys(), key=lambda x: entries_size[x])
     for file_name in file_names:
         if file_name in entries_refpkg.keys():
-            if '0B3F' not in file_name:
+            if '1A4A' not in file_name:
                 continue
             print(f'Unpacking {file_name}')
             unpack_map(file_name, pkg_name)
