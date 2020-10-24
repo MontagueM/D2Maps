@@ -50,7 +50,6 @@ def get_header(file_hex, header):
 
 
 def unpack_map(main_file, pkg_name):
-    # If the file is too large you can uncomment the LARGE stuff
     d2map = Map(name=main_file)
     gf.mkdir(f'C:/d2_maps/{pkg_name}_fbx/')
 
@@ -62,14 +61,6 @@ def unpack_map(main_file, pkg_name):
     get_transform_data(d2map)
     get_model_refs(d2map)
     get_copy_counts(d2map)
-    # if main_file == '0932-000001FE':  # LARGE
-    #     LARGE_total_end_files = 2  # LARGE
-    #     for i in range(LARGE_total_end_files):  # LARGE
-    #         split_len = int(len(transforms_array)/LARGE_total_end_files)  # LARGE
-    #         obj_strings = get_model_obj_strings(transforms_array[split_len*i:split_len*(i+1)], version, scale_coords_extra, modifiers)  # LARGE
-    #         write_obj_strings(obj_strings, folder_name, main_file, i)  # LARGE
-    # else:
-    #     return  # LARGE
 
     compute_coords(d2map)
     write_fbx(d2map)
@@ -192,7 +183,7 @@ def get_map_moved_verts(submesh: met.Submesh, location):
     for i in range(len(submesh.adjusted_pos_verts)):
         for j in range(3):
             submesh.adjusted_pos_verts[i][j] += location[j]
-            submesh.adjusted_pos_verts[i][j] *= 100
+            # submesh.adjusted_pos_verts[i][j] *= 100
 
 
 def rotate_verts(submesh: met.Submesh, rotations, inverse=False):
@@ -231,7 +222,7 @@ def add_model_to_fbx_map(d2map: Map, model_file: met.ModelFile, submesh: met.Sub
 
 def create_mesh(d2map: Map, submesh: met.Submesh, name):
     mesh = fbx.FbxMesh.Create(d2map.fbx_model.scene, name)
-    controlpoints = [fbx.FbxVector4(x[0], x[1], x[2]) for x in submesh.adjusted_pos_verts]
+    controlpoints = [fbx.FbxVector4(-x[0], x[2], x[1]) for x in submesh.adjusted_pos_verts]
     for i, p in enumerate(controlpoints):
         mesh.SetControlPointAt(p, i)
     for face in submesh.faces:
@@ -302,8 +293,8 @@ def unpack_folder(pkg_name):
     file_names = sorted(entries_refid.keys(), key=lambda x: entries_size[x])
     for file_name in file_names:
         if file_name in entries_refpkg.keys():
-            if '04C2' not in file_name:
-                continue
+            # if '01FE' not in file_name:
+            #     continue
             print(f'Unpacking {file_name}')
             unpack_map(file_name, pkg_name)
 
@@ -312,4 +303,4 @@ if __name__ == '__main__':
     pkg_db.start_db_connection()
     all_file_info = {x[0]: dict(zip(['RefID', 'RefPKG', 'FileType'], x[1:])) for x in
                      pkg_db.get_entries_from_table('Everything', 'FileName, RefID, RefPKG, FileType')}
-    unpack_folder('advent_summer_event_0362')
+    unpack_folder('fleet_039a')

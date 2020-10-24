@@ -282,7 +282,6 @@ def scale_and_repos_pos_verts(verts_data, model_file):
 
 
 def scale_and_repos_uv_verts(verts_data, model_file):
-
     scales = [struct.unpack('f', bytes.fromhex(model_file.model_file_hex[0x70*2+i*8:0x70*2+(i+1)*8]))[0] for i in range(2)]
     position_shifts = [struct.unpack('f', bytes.fromhex(model_file.model_file_hex[0x78*2+i*8:0x78*2+(i+1)*8]))[0] for i in range(2)]
     for i in range(len(verts_data)):
@@ -292,6 +291,11 @@ def scale_and_repos_uv_verts(verts_data, model_file):
     for j in range(len(verts_data)):
         verts_data[j][0] -= (scales[0] - position_shifts[0])
         verts_data[j][1] += (scales[1] - position_shifts[1] + 1)
+
+    # flip uv tests
+
+    # for j in range(len(verts_data)):
+    #     verts_data[j] = verts_data[j][::-1]
 
     return verts_data
 
@@ -349,6 +353,8 @@ def get_verts_data(verts_file, all_file_info, is_uv):
     else:
         print(f'Verts: Incorrect type of file {ref_file_type} for ref file {ref_file} verts file {verts_file}')
         return None
+
+    print('stridelength', stride_header.StrideLength)
     if stride_header.StrideLength == 4:
         """
         UV info for dynamic, physics-based objects.
@@ -447,7 +453,7 @@ def get_coords_12(hex_data_split, is_uv):
     for hex_data in hex_data_split:
         if is_uv:
             uv = []
-            for j in range(3, 5):
+            for j in range(0, 2):
                 flt = get_float16(hex_data, j)
                 uv.append(flt)
             uvs.append(uv)

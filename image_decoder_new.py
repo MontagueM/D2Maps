@@ -237,9 +237,10 @@ def get_image_from_file(file_path, save_path=None):
     entries = pkg_db.get_entries_from_table(file_pkg, 'FileName, RefID, RefPKG, FileType')
     this_entry = [x for x in entries if x[0] == file_name][0]
     ref_file_name = f'{this_entry[2][2:]}-{gf.fill_hex_with_zeros(this_entry[1][2:], 4)}'
+    ref_pkg = gf.get_pkg_name(ref_file_name)
     if this_entry[-1] == 'Texture Header':
         header_hex = gf.get_hex_data(file_path)
-        data_hex = gf.get_hex_data(f'{"/".join(file_path.split("/")[:-1])}/{ref_file_name}.bin')
+        data_hex = gf.get_hex_data(f'C:/d2_output/{ref_pkg}/{ref_file_name}.bin')
     elif this_entry[-1] == 'Texture Data':
         print('Only pass through header please, cba to fix this.')
         return
