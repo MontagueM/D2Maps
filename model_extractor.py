@@ -211,6 +211,7 @@ def get_submeshes(model_file: ModelFile):
         entry = get_header(e, LODSubmeshEntry())
         actual_submeshes.append(entry)
 
+    # TODO fix this double call
     relevant_textures = get_materials(model_file)
 
     for i, e in enumerate(actual_submeshes):
@@ -348,7 +349,6 @@ def get_verts_data(verts_file, all_file_info, is_uv):
     else:
         print(f'Verts: Incorrect type of file {ref_file_type} for ref file {ref_file} verts file {verts_file}')
         return None
-    print(f'stride {stride_header.StrideLength} isuv {is_uv}')
     if stride_header.StrideLength == 4:
         """
         UV info for dynamic, physics-based objects.
@@ -639,4 +639,4 @@ if __name__ == '__main__':
     # 86BFFE80
 
     """UVs wrong for 2012C780, B7BDFE80"""
-    get_model('62CFF680')
+    get_model('AB27ED80')

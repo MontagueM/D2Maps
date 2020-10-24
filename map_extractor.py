@@ -52,6 +52,7 @@ def get_header(file_hex, header):
 def unpack_map(main_file, pkg_name):
     # If the file is too large you can uncomment the LARGE stuff
     d2map = Map(name=main_file)
+    gf.mkdir(f'C:/d2_maps/{pkg_name}_fbx/')
 
     d2map.fbx_model = pfb.Model()
     d2map.fbx_model.create_node()
@@ -290,7 +291,6 @@ def create_uv(mesh, name, submesh: met.Submesh, layer):
 
 
 def write_fbx(d2map: Map):
-    gf.mkdir(f'C:/d2_maps/{d2map.pkg_name}_fbx/')
     d2map.fbx_model.export(save_path=f'C:/d2_maps/{d2map.pkg_name}_fbx/{d2map.name}.fbx', ascii_format=False)
     print('Wrote fbx')
 
@@ -302,7 +302,7 @@ def unpack_folder(pkg_name):
     file_names = sorted(entries_refid.keys(), key=lambda x: entries_size[x])
     for file_name in file_names:
         if file_name in entries_refpkg.keys():
-            if '1A4A' not in file_name:
+            if '04C2' not in file_name:
                 continue
             print(f'Unpacking {file_name}')
             unpack_map(file_name, pkg_name)
@@ -312,4 +312,4 @@ if __name__ == '__main__':
     pkg_db.start_db_connection()
     all_file_info = {x[0]: dict(zip(['RefID', 'RefPKG', 'FileType'], x[1:])) for x in
                      pkg_db.get_entries_from_table('Everything', 'FileName, RefID, RefPKG, FileType')}
-    unpack_folder('city_tower_d2_0369')
+    unpack_folder('advent_summer_event_0362')
