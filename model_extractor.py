@@ -354,7 +354,7 @@ def get_verts_data(verts_file, all_file_info, is_uv):
         print(f'Verts: Incorrect type of file {ref_file_type} for ref file {ref_file} verts file {verts_file}')
         return None
 
-    print('stridelength', stride_header.StrideLength)
+    # print('stridelength', stride_header.StrideLength)
     if stride_header.StrideLength == 4:
         """
         UV info for dynamic, physics-based objects.
@@ -563,6 +563,8 @@ def get_submesh_textures(model_file: ModelFile, submesh: Submesh, custom_dir=Fal
         if custom_dir:
             gf.mkdir(f'{custom_dir}/')
             if not os.path.exists(f'{custom_dir}/{img}.png'):
+                if img == 'FBFF-1FFF':
+                    continue
                 imager.get_image_from_file(f'C:/d2_output/{gf.get_pkg_name(img)}/{img}.bin', f'{custom_dir}/')
         else:
             gf.mkdir(f'C:/d2_model_temp/texture_models/{model_file.uid}/textures/')
@@ -640,9 +642,4 @@ if __name__ == '__main__':
     all_file_info = {x[0]: dict(zip(['RefID', 'RefPKG', 'FileType'], x[1:])) for x in
                      pkg_db.get_entries_from_table('Everything', 'FileName, RefID, RefPKG, FileType')}
 
-    # 75465881
-    # 74324081
-    # 86BFFE80
-
-    """UVs wrong for 2012C780, B7BDFE80"""
-    get_model('AB27ED80')
+    get_model('D450EC80')

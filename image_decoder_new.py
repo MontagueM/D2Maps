@@ -234,6 +234,7 @@ def get_image_from_file(file_path, save_path=None):
     file_pkg = file_path.split('/')[-2]
     # To get the actual image data we need to pull this specific file's data from the database as it references its file
     # in its RefID.
+    # TODO FIX THIS REMOVE IT BAD BAD BAD
     entries = pkg_db.get_entries_from_table(file_pkg, 'FileName, RefID, RefPKG, FileType')
     this_entry = [x for x in entries if x[0] == file_name][0]
     ref_file_name = f'{this_entry[2][2:]}-{gf.fill_hex_with_zeros(this_entry[1][2:], 4)}'

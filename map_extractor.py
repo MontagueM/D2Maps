@@ -11,9 +11,10 @@ import gf
 
 @dataclass
 class CountEntry:
-    Field0: np.uint16 = np.uint32(0)
-    Field2: np.uint32 = np.uint32(0)
-    Field6: np.uint16 = np.uint32(0)
+    Count: np.uint16 = np.uint16(0)
+    CumulativeCount: np.uint16 = np.uint16(0)
+    ModelRef: np.uint16 = np.uint16(0)
+    Unk: np.uint16 = np.uint16(0)
 
 
 class Map(met.File):
@@ -117,9 +118,15 @@ def get_model_refs(d2map: Map):
 def get_copy_counts(d2map: Map):
     entries_hex = [d2map.copy_counts_hex[i:i + 8 * 2] for i in range(0, len(d2map.copy_counts_hex), 8 * 2)]
     entries = []
+    count_dict = {}
     for e in entries_hex:
         entries.append(get_header(e, CountEntry()))
-    d2map.copy_counts = [e.Field0 for e in entries]
+    for entry in entries:
+        if entry.ModelRef not in count_dict.keys():
+            count_dict[entry.ModelRef] = 0
+        count_dict[entry.ModelRef] += entry.Count
+    _, d2map.copy_counts = zip(*sorted(zip(count_dict.keys(), count_dict.values())))
+    print('')
 
 
 def get_transforms_array(model_refs, copy_counts, rotations, location, map_scaler):
@@ -141,17 +148,13 @@ def get_transforms_array(model_refs, copy_counts, rotations, location, map_scale
 def compute_coords(d2map: Map):
     nums = 0
     for i, model_ref in enumerate(d2map.model_refs):
-        # if i > 0:
-        #     return
-        # if model_ref != '7C23ED80':
-        #     continue
         print(f'Getting obj {i + 1}/{len(d2map.model_refs)} {model_ref} {nums}')
 
         model_file = met.ModelFile(uid=model_ref)
         model_file.get_model_data_file()
         ret = met.get_model_data(model_file, all_file_info)
         if not ret:
-            nums += 1
+            nums += d2map.copy_counts[i]
             continue
         met.get_submeshes(model_file)
         met.get_materials(model_file)
@@ -165,7 +168,7 @@ def compute_coords(d2map: Map):
                     if submesh.type == 769 or submesh.type == 770 or submesh.type == 778:
                         rotate_verts(submesh, d2map.rotations[nums])
                         get_map_scaled_verts(submesh, d2map.scales[nums])
-                        get_map_moved_verts(submesh, d2map.locations[nums])
+                        get_map_moved_verts(submesh, d2map.locations[nums], d2map.scales[nums])
                         submesh.faces, max_vert_used = met.adjust_faces_data(submesh.faces, max_vert_used)
                         submesh.faces = met.shift_faces_down(submesh.faces)
 
@@ -174,15 +177,16 @@ def compute_coords(d2map: Map):
 
 
 def get_map_scaled_verts(submesh: met.Submesh, map_scaler):
+    # return
     for i in range(len(submesh.adjusted_pos_verts)):
         for j in range(3):
             submesh.adjusted_pos_verts[i][j] *= map_scaler
 
 
-def get_map_moved_verts(submesh: met.Submesh, location):
+def get_map_moved_verts(submesh: met.Submesh, location, scale):
     for i in range(len(submesh.adjusted_pos_verts)):
         for j in range(3):
-            submesh.adjusted_pos_verts[i][j] += location[j]
+            submesh.adjusted_pos_verts[i][j] += location[j]# * scale
             # submesh.adjusted_pos_verts[i][j] *= 100
 
 
@@ -293,8 +297,8 @@ def unpack_folder(pkg_name):
     file_names = sorted(entries_refid.keys(), key=lambda x: entries_size[x])
     for file_name in file_names:
         if file_name in entries_refpkg.keys():
-            # if '01FE' not in file_name:
-            #     continue
+            if '02DF' not in file_name:
+                continue
             print(f'Unpacking {file_name}')
             unpack_map(file_name, pkg_name)
 
@@ -303,4 +307,4 @@ if __name__ == '__main__':
     pkg_db.start_db_connection()
     all_file_info = {x[0]: dict(zip(['RefID', 'RefPKG', 'FileType'], x[1:])) for x in
                      pkg_db.get_entries_from_table('Everything', 'FileName, RefID, RefPKG, FileType')}
-    unpack_folder('fleet_039a')
+    unpack_folder('orphaned_0932')
