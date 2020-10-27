@@ -546,7 +546,7 @@ def export_fbx(model_file: ModelFile, submesh: Submesh, name):
     node, mesh = create_mesh(model, submesh.pos_verts, submesh.faces, name)
     if submesh.material:
         get_submesh_textures(model_file, submesh)
-        shaders.get_shader(model_file, submesh, all_file_info)
+        shaders.get_shader(model_file, submesh, all_file_info, name)
         print(f'submesh {name} has mat file {submesh.material.name} with textures {submesh.textures}')
         if submesh.diffuse:
             if not mesh.GetLayer(0):
@@ -659,4 +659,4 @@ if __name__ == '__main__':
     all_file_info = {x[0]: dict(zip(['RefID', 'RefPKG', 'FileType'], x[1:])) for x in
                      pkg_db.get_entries_from_table('Everything', 'FileName, RefID, RefPKG, FileType')}
 
-    get_model('9728ED80')
+    get_model('4FF55681')

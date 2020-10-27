@@ -6,12 +6,12 @@ import shutil
 import struct
 
 
-def get_shader(model_file, submesh, all_file_info):
+def get_shader(model_file, submesh, all_file_info, name):
     shader = met.File(uid=submesh.material.fhex[0x2C8 * 2:0x2C8 * 2 + 8])
     shader.get_file_from_uid()
     shader_ref = f"{all_file_info[shader.name]['RefPKG'][2:]}-{all_file_info[shader.name]['RefID'][2:]}"
     get_decompiled_hlsl(shader_ref, model_file.uid)
-    convert_hlsl(submesh.material, submesh.textures, shader_ref, model_file.uid, all_file_info)
+    convert_hlsl(submesh.material, submesh.textures, shader_ref, model_file.uid, all_file_info, name)
 
 
 def get_decompiled_hlsl(shader_ref, uid):
@@ -23,7 +23,7 @@ def get_decompiled_hlsl(shader_ref, uid):
     print(f'Decompiled and moved shader {shader_ref}.hlsl')
 
 
-def convert_hlsl(material, textures, shader_ref, uid, all_file_info):
+def convert_hlsl(material, textures, shader_ref, uid, all_file_info, name):
     print(f'Material {material.name}')
     lines_to_write = []
 
@@ -38,17 +38,19 @@ def convert_hlsl(material, textures, shader_ref, uid, all_file_info):
         input_append = get_inputs_append(inputs)
         texs = get_texs(text)
         params, params_end = get_params(texs)
+        tex_comments = get_tex_comments(textures)
         lines_to_write.append('#pragma once\n')
-        lines_to_write.append(f'static float4 cb0[{cbuffer_length}] = \n{cbuffer1}\n' + '};\n')
+        lines_to_write.append(tex_comments)
+        lines_to_write.append(f'static float4 cb0[{cbuffer_length}] = \n' + '{\n' + f'{cbuffer1}\n' + '};\n')
         lines_to_write.append(input_append)
         lines_to_write.append('\n\nstruct shader {\nfloat4 main(\n')
         lines_to_write.append(params)
         lines_to_write.append(f'    float4 {",".join(outputs)};\n')
         lines_to_write.append(instructions)
-        lines_to_write.append('}\n};\n\nshader s;\n\n' + f'return shader.main({params_end});')
+        lines_to_write.append('}\n};\n\nshader s;\n\n' + f'return s.main({params_end});')
 
     for i in range(3):
-        with open(f'C:/d2_model_temp/texture_models/{uid}/hlsl/{shader_ref}_o{i}.usf', 'w') as u:
+        with open(f'C:/d2_model_temp/texture_models/{uid}/hlsl/{name}_{shader_ref}_o{i}.usf', 'w') as u:
         # with open(f'hlsl/.usf', 'w') as u:
             # TODO convert to an array write, faster
             for line in lines_to_write:
@@ -57,6 +59,13 @@ def convert_hlsl(material, textures, shader_ref, uid, all_file_info):
                 u.write(line)
             print('Wrote to file')
         print('')
+
+
+def get_tex_comments(textures):
+    comments = ''
+    for i, t in enumerate(textures):
+        comments += f'// t{i} is {t}\n'
+    return comments
 
 
 def get_inputs_append(inputs):
