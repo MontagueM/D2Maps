@@ -546,7 +546,7 @@ def export_fbx(model_file: ModelFile, submesh: Submesh, name):
     node, mesh = create_mesh(model, submesh.pos_verts, submesh.faces, name)
     if submesh.material:
         get_submesh_textures(model_file, submesh)
-        shaders.get_shader(submesh, all_file_info)
+        shaders.get_shader(model_file, submesh, all_file_info)
         print(f'submesh {name} has mat file {submesh.material.name} with textures {submesh.textures}')
         if submesh.diffuse:
             if not mesh.GetLayer(0):
@@ -566,13 +566,13 @@ def export_fbx(model_file: ModelFile, submesh: Submesh, name):
 
 def get_submesh_textures(model_file: ModelFile, submesh: Submesh, custom_dir=False):
     submesh.material.get_hex_data()
-    offset = submesh.material.f_hex.find('11728080')
-    count = int(gf.get_flipped_hex(submesh.material.f_hex[offset-16:offset-8], 8), 16)
+    offset = submesh.material.fhex.find('11728080')
+    count = int(gf.get_flipped_hex(submesh.material.fhex[offset-16:offset-8], 8), 16)
     # Arbritrary
     if count < 0 or count > 100:
         return
-    image_indices = [gf.get_file_from_hash(submesh.material.f_hex[offset+16+8*(2*i):offset+16+8*(2*i)+8]) for i in range(count)]
-    images = [gf.get_file_from_hash(submesh.material.f_hex[offset+16+8+8*(2*i):offset+16+8*(2*i)+16]) for i in range(count)]
+    image_indices = [gf.get_file_from_hash(submesh.material.fhex[offset+16+8*(2*i):offset+16+8*(2*i)+8]) for i in range(count)]
+    images = [gf.get_file_from_hash(submesh.material.fhex[offset+16+8+8*(2*i):offset+16+8*(2*i)+16]) for i in range(count)]
     if len(images) == 0:
         return
     submesh.diffuse = images[0]
@@ -659,4 +659,4 @@ if __name__ == '__main__':
     all_file_info = {x[0]: dict(zip(['RefID', 'RefPKG', 'FileType'], x[1:])) for x in
                      pkg_db.get_entries_from_table('Everything', 'FileName, RefID, RefPKG, FileType')}
 
-    get_model('9224ED80')
+    get_model('9728ED80')
