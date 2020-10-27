@@ -73,7 +73,10 @@ def get_inputs_append(inputs):
     for inp in inputs:
         inps = inp.split(' ')
         if 'TEXCOORD' in inp:
-            write = f'\nstatic {inps[2]} {inps[3]} = ' + '{1, 1, 1, 1};\n'
+            if 'float4' in inp:
+                write = f'\nstatic {inps[2]} {inps[3]} = ' + '{1, 1, 1, 1};\n'
+            elif 'float3' in inp:
+                write = f'\nstatic {inps[2]} {inps[3]} = ' + '{1, 1, 1};\n'
         elif 'SV_isFrontFace0' in inp:
             write = f'\nstatic {inps[2]} {inps[3]} = 1;\n'
         else:
