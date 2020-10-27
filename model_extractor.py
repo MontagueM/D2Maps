@@ -7,6 +7,7 @@ import fbx
 import pyfbx as pfb
 import gf
 import image_decoder_new as imager
+import get_shader as shaders
 
 version = '2_9_2_1_all'
 
@@ -31,6 +32,7 @@ class File:
         self.name = name
         self.uid = uid
         self.pkg_name = pkg_name
+        self.fhex = None
 
     def get_file_from_uid(self):
         self.name = gf.get_file_from_hash(self.uid)
@@ -43,6 +45,14 @@ class File:
     def get_pkg_name(self):
         self.pkg_name = gf.get_pkg_name(self.name)
         return self.pkg_name
+
+    def get_hex_data(self):
+        if not self.pkg_name:
+            self.get_pkg_name()
+        if not self.name:
+            self.get_file_from_uid()
+        self.fhex = gf.get_hex_data(f'C:/d2_output/{self.pkg_name}/{self.name}.bin')
+        return self.fhex
 
 
 class ModelFile(File):
@@ -84,6 +94,7 @@ class Submesh:
         self.uv_verts = []
         self.faces = []
         self.material = None
+        self.textures = []
         self.diffuse = None
         self.normal = None
         self.type = 0
@@ -282,6 +293,7 @@ def scale_and_repos_pos_verts(verts_data, model_file):
 
 
 def scale_and_repos_uv_verts(verts_data, model_file):
+    # return verts_data
     scales = [struct.unpack('f', bytes.fromhex(model_file.model_file_hex[0x70*2+i*8:0x70*2+(i+1)*8]))[0] for i in range(2)]
     position_shifts = [struct.unpack('f', bytes.fromhex(model_file.model_file_hex[0x78*2+i*8:0x78*2+(i+1)*8]))[0] for i in range(2)]
     for i in range(len(verts_data)):
@@ -534,6 +546,8 @@ def export_fbx(model_file: ModelFile, submesh: Submesh, name):
     node, mesh = create_mesh(model, submesh.pos_verts, submesh.faces, name)
     if submesh.material:
         get_submesh_textures(model_file, submesh)
+        shaders.get_shader(submesh, all_file_info)
+        print(f'submesh {name} has mat file {submesh.material.name} with textures {submesh.textures}')
         if submesh.diffuse:
             if not mesh.GetLayer(0):
                 mesh.CreateLayer()
@@ -551,14 +565,18 @@ def export_fbx(model_file: ModelFile, submesh: Submesh, name):
 
 
 def get_submesh_textures(model_file: ModelFile, submesh: Submesh, custom_dir=False):
-    f_hex = gf.get_hex_data(f'C:/d2_output/{submesh.material.get_pkg_name()}/{submesh.material.name}.bin')
-    offset = f_hex.find('11728080')
-    count = int(gf.get_flipped_hex(f_hex[offset-16:offset-8], 8), 16)
+    submesh.material.get_hex_data()
+    offset = submesh.material.f_hex.find('11728080')
+    count = int(gf.get_flipped_hex(submesh.material.f_hex[offset-16:offset-8], 8), 16)
     # Arbritrary
     if count < 0 or count > 100:
         return
-    images = [gf.get_file_from_hash(f_hex[offset+16+8+8*(2*i):offset+16+8*(2*i)+16]) for i in range(count)]
+    image_indices = [gf.get_file_from_hash(submesh.material.f_hex[offset+16+8*(2*i):offset+16+8*(2*i)+8]) for i in range(count)]
+    images = [gf.get_file_from_hash(submesh.material.f_hex[offset+16+8+8*(2*i):offset+16+8*(2*i)+16]) for i in range(count)]
+    if len(images) == 0:
+        return
     submesh.diffuse = images[0]
+    submesh.textures = images
     for img in images:
         if custom_dir:
             gf.mkdir(f'{custom_dir}/')
@@ -570,7 +588,6 @@ def get_submesh_textures(model_file: ModelFile, submesh: Submesh, custom_dir=Fal
             gf.mkdir(f'C:/d2_model_temp/texture_models/{model_file.uid}/textures/')
             if not os.path.exists(f'C:/d2_model_temp/texture_models/{model_file.uid}/textures/{img}.png'):
                 imager.get_image_from_file(f'C:/d2_output/{gf.get_pkg_name(img)}/{img}.bin', f'C:/d2_model_temp/texture_models/{model_file.uid}/textures/')
-
 
 
 def create_mesh(fbx_map, pos_verts_data, faces_data, name):
@@ -642,4 +659,4 @@ if __name__ == '__main__':
     all_file_info = {x[0]: dict(zip(['RefID', 'RefPKG', 'FileType'], x[1:])) for x in
                      pkg_db.get_entries_from_table('Everything', 'FileName, RefID, RefPKG, FileType')}
 
-    get_model('D450EC80')
+    get_model('9224ED80')

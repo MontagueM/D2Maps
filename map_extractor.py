@@ -297,14 +297,18 @@ def unpack_folder(pkg_name):
     file_names = sorted(entries_refid.keys(), key=lambda x: entries_size[x])
     for file_name in file_names:
         if file_name in entries_refpkg.keys():
-            if '02DF' not in file_name:
+            # a = [x.split('.')[0] for x in os.listdir('C:\d2_maps/orphaned_0932_fbx/')]
+            if file_name in [x.split('.')[0] for x in os.listdir(f'C:\d2_maps/{pkg_name}_fbx/')]:
                 continue
+            # if '02DF' not in file_name:
+            #     continue
             print(f'Unpacking {file_name}')
             unpack_map(file_name, pkg_name)
 
 
 if __name__ == '__main__':
+    import os
     pkg_db.start_db_connection()
     all_file_info = {x[0]: dict(zip(['RefID', 'RefPKG', 'FileType'], x[1:])) for x in
                      pkg_db.get_entries_from_table('Everything', 'FileName, RefID, RefPKG, FileType')}
-    unpack_folder('orphaned_0932')
+    unpack_folder('dreaming_city_035a')

@@ -1,0 +1,135 @@
+#pragma once
+
+static float4 cb12[1] =
+{
+	float4(1, 1, 1, 0),
+};
+
+static float4 cb0[19] =
+{
+	float4(0.0, 2.5, 0.0, 0.0),
+	float4(0.75, 0.75, 0.0, 0.0),
+	float4(0.30000001192092896, 1.0, 0.0, 0.0),
+	float4(0.014999999664723873, 1.0, 1.0, 1.0),
+	float4(1.0, 0.0, 0.0, 0.0),
+	float4(0.0, 1.0, 0.0, 0.0),
+	float4(0.13634942471981049, 0.11454851925373077, 0.09408106654882431, 1.0),
+	float4(1.9921875, -1.0, 0.3999999761581421, 0.0),
+	float4(0.19921875, -0.10000000149011612, 0.7420626878738403, 0.0),
+	float4(0.800000011920929, -0.800000011920929, 0.0, 0.0),
+	float4(0.07999999821186066, 0.07999999821186066, 0.07999999821186066, 0.0),
+	float4(0.9200000166893005, 0.9200000166893005, 0.9200000166893005, 1.0),
+	float4(8.0, 1.0, 1.0, 1.0),
+	float4(1.0, 1.0, 1.0, 1.0),
+	float4(0.8999999761581421, 0.30000007152557373, 0.0, 0.0),
+	float4(0.7972024083137512, 0.7972024083137512, 0.7972024083137512, 1.0),
+	float4(0.9046611785888672, 0.9046611785888672, 0.9046611785888672, 1.0),
+	float4(0.20000000298023224, 0.20000000298023224, 0.20000000298023224, 1.0),
+	float4(-1.0, 2.0, 0.0, 0.0),
+};
+
+struct shader_struct {
+float4 main(
+  float4 v0,
+  float4 v1,
+  float4 v2,
+  float4 v3,
+  float4 v4,
+  float4 t0,
+  float4 t1,
+  float4 t2,
+  float4 t3,
+  float4 t4,
+  float4 t5)
+{
+  float4 r0, r1, r2;
+  float4 o0, o1, o2;
+
+  r0.xyz = cb12[0].xyz + -v4.xyz;
+  r0.w = dot(r0.xyz, r0.xyz);
+  r0.w = rsqrt(r0.w);
+  r0.xyz = r0.xyz * r0.www;
+  r1.x = dot(r0.xyz, v1.xyz);
+  r1.y = dot(r0.xyz, v2.xyz);
+  r0.x = dot(r0.xyz, v0.xyz);
+  r0.yz = cb0[3].xx * r1.xy;
+  r0.xy = r0.yz / r0.xx;
+  r0.xy = v3.xy + -r0.xy;
+  r0.x = Material_Texture2D_2.SampleLevel(Material_Texture2D_1Sampler, r0.xy, 0).x;
+  r0.x = saturate(r0.x);
+  r0.xyz = cb0[11].xyz * r0.xxx + cb0[10].xyz;
+  r1.xyzw = Material_Texture2D_0.SampleLevel(Material_Texture2D_0Sampler, v3.xy, 0).xyzw;
+  r0.xyz = r1.xyz * r0.xyz;
+  r0.w = cb0[13].x * cb0[12].x;
+  r0.xyz = r0.xyz * r0.www;
+  r0.w = dot(cb0[4].xy, v3.xy);
+  r2.x = cb0[4].z + r0.w;
+  r0.w = dot(cb0[5].xy, v3.xy);
+  r2.y = cb0[5].z + r0.w;
+  r0.w = Material_Texture2D_3.SampleLevel(Material_Texture2D_0Sampler, r2.xy, 0).x;
+  r0.w = saturate(cb0[0].y * r0.w + cb0[0].x);
+  r2.x = saturate(cb0[9].y * r0.w + cb0[9].x);
+  r2.yzw = cb0[6].xyz + -r1.xyz;
+  r1.xyz = r0.www * r2.yzw + r1.xyz;
+  r0.w = saturate(cb0[18].y * r0.w + cb0[18].x);
+  r2.yzw = r2.xxx * r0.xyz + r1.xyz;
+  r0.xyz = r2.xxx * r0.xyz;
+  r2.x = max(r2.z, r2.w);
+  r2.x = max(r2.y, r2.x);
+  r2.x = saturate(-1 + r2.x);
+  r2.x = 1 + -r2.x;
+  r1.xyz = r1.xyz * r2.xxx + r0.xyz;
+  r2.x = max(r1.y, r1.z);
+  r2.x = max(r2.x, r1.x);
+  r2.x = max(1, r2.x);
+  o0.xyz = r1.xyz / r2.xxx;
+  o0.w = 0.200000003;
+  r1.x = cb0[16].x + -cb0[15].x;
+  r1.x = r1.w * r1.x + cb0[15].x;
+  r1.yz = v3.xy * cb0[1].xy + cb0[1].zw;
+  r1.w = Material_Texture2D_1.SampleLevel(Material_Texture2D_0Sampler, r1.yz, 0).x;
+  r2.xyz = Material_Texture2D_5.SampleLevel(Material_Texture2D_0Sampler, r1.yz, 0).xyz;
+  r1.y = cb0[14].y * r1.w + cb0[14].x;
+  r1.z = r1.y * r1.x;
+  r1.x = -r1.y * r1.x + cb0[17].x;
+  r0.w = saturate(r0.w * r1.x + r1.z);
+  r1.x = saturate(cb0[8].z + r2.z);
+  r1.yz = r2.xy * cb0[8].xx + cb0[8].yy;
+  r2.xy = v3.xy * cb0[2].xy + cb0[2].zw;
+  r2.xyz = Material_Texture2D_4.SampleLevel(Material_Texture2D_0Sampler, r2.xy, 0).xyz;
+  r1.w = saturate(cb0[7].z + r2.z);
+  r2.xy = r2.xy * cb0[7].xx + cb0[7].yy;
+  r1.yz = r2.xy + r1.yz;
+  r1.x = min(r1.w, r1.x);
+  r0.w = min(r1.x, r0.w);
+  r0.w = r0.w * 0.125 + 0.375;
+  r2.xyz = v2.xyz * r1.zzz;
+  r2.xyz = v1.xyz * r1.yyy + r2.xyz;
+  r1.x = dot(r1.yz, r1.yz);
+  r1.x = 1 + -r1.x;
+  r1.x = max(0, r1.x);
+  r1.x = sqrt(r1.x);
+  r1.xyz = v0.xyz * r1.xxx + r2.xyz;
+  r1.w = dot(r1.xyz, r1.xyz);
+  r1.w = rsqrt(r1.w);
+  r1.xyz = r1.xyz * r1.www;
+  o1.xyz = saturate(r1.xyz * r0.www + float3(0.5,0.5,0.5));
+  o1.w = 0;
+  r0.y = max(r0.y, r0.z);
+  r0.x = max(r0.x, r0.y);
+  r0.y = 9.99999975e-006 < r0.x;
+  r0.x = 0.0078125 + r0.x;
+  r0.x = log2(r0.x);
+  r0.x = saturate(r0.x * 0.0769230798 + 0.538461566);
+  r0.x = 1.00784314 + r0.x;
+  r0.x = 0.5 * r0.x;
+  o2.y = r0.y ? r0.x : 0.5;
+  o2.xz = float2(0,0);
+  o2.w = v0.w;
+  return o2;
+}
+};
+
+shader_struct t;
+
+return t.main(v0, v1, v2, v3, v4, t0, t1, t2, t3, t4, t5);
