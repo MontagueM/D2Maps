@@ -31,6 +31,7 @@ class Map(met.File):
         self.copy_counts = []
         self.fbx_model = None
         self.materials = {}
+        self.material_files = []
 
 
 def get_header(file_hex, header):
@@ -64,6 +65,7 @@ def unpack_map(main_file, pkg_name):
     get_copy_counts(d2map)
 
     compute_coords(d2map)
+    get_shader_info(d2map)
     write_fbx(d2map)
 
 
@@ -211,17 +213,36 @@ def shift_faces_down(faces_data):
     return faces_data
 
 
+def get_shader_info(d2map: Map):
+    for material in d2map.material_files:
+        textures = met.get_material_textures(material, custom_dir=f'C:/d2_maps/{d2map.pkg_name}_fbx/textures/')
+        met.get_shader_file(material, textures, all_file_info, custom_dir=f'C:/d2_maps/{d2map.pkg_name}_fbx/shaders/')
+
+
 def add_model_to_fbx_map(d2map: Map, model_file: met.ModelFile, submesh: met.Submesh, name):
     node, mesh = create_mesh(d2map, submesh, name)
-    met.get_submesh_textures(model_file, submesh, custom_dir=f'C:/d2_maps/{d2map.pkg_name}_fbx/textures/')
+    # met.get_submesh_textures(model_file, submesh, custom_dir=f'C:/d2_maps/{d2map.pkg_name}_fbx/textures/')
     if not mesh.GetLayer(0):
         mesh.CreateLayer()
     layer = mesh.GetLayer(0)
-
-    apply_diffuse(d2map, submesh, node)
+    apply_shader(d2map, submesh, node)
+    # apply_diffuse(d2map, submesh, node)
     create_uv(mesh, name, submesh, layer)
     node.SetShadingMode(fbx.FbxNode.eTextureShading)
     d2map.fbx_model.scene.GetRootNode().AddChild(node)
+
+
+def apply_shader(d2map: Map, submesh: met.Submesh, node):
+    lMaterialName = f'{submesh.material.name}'
+    if lMaterialName in d2map.materials.keys():
+        node.AddMaterial(d2map.materials[lMaterialName])
+        return
+    lMaterial = fbx.FbxSurfacePhong.Create(d2map.fbx_model.scene, lMaterialName)
+    d2map.materials[lMaterialName] = lMaterial
+    d2map.material_files.append(met.File(name=lMaterialName))
+    # lMaterial.DiffuseFactor.Set(1)
+    lMaterial.ShadingModel.Set('Phong')
+    node.AddMaterial(lMaterial)
 
 
 def create_mesh(d2map: Map, submesh: met.Submesh, name):
@@ -284,10 +305,9 @@ def create_uv(mesh, name, submesh: met.Submesh, layer):
     return layer
 
 
-
 def write_fbx(d2map: Map):
     d2map.fbx_model.export(save_path=f'C:/d2_maps/{d2map.pkg_name}_fbx/{d2map.name}.fbx', ascii_format=False)
-    print('Wrote fbx')
+    print(f'Wrote fbx of {d2map.name}')
 
 
 def unpack_folder(pkg_name):
@@ -298,17 +318,18 @@ def unpack_folder(pkg_name):
     for file_name in file_names:
         if file_name in entries_refpkg.keys():
             # a = [x.split('.')[0] for x in os.listdir('C:\d2_maps/orphaned_0932_fbx/')]
-            if file_name in [x.split('.')[0] for x in os.listdir(f'C:\d2_maps/{pkg_name}_fbx/')]:
-                continue
-            # if '02DF' not in file_name:
+            # if file_name in [x.split('.')[0] for x in os.listdir(f'C:\d2_maps/{pkg_name}_fbx/')]:
             #     continue
+            if '1A4A' not in file_name:
+                continue
             print(f'Unpacking {file_name}')
             unpack_map(file_name, pkg_name)
 
 
 if __name__ == '__main__':
     import os
+    # WARNING THIS CURRENTLY DOES NOT OVERWRITE SHADER FILES THAT ARE ALREADY WRITTEN
     pkg_db.start_db_connection()
     all_file_info = {x[0]: dict(zip(['RefID', 'RefPKG', 'FileType'], x[1:])) for x in
                      pkg_db.get_entries_from_table('Everything', 'FileName, RefID, RefPKG, FileType')}
-    unpack_folder('dreaming_city_035a')
+    unpack_folder('city_tower_d2_0369')

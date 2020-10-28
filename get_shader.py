@@ -4,6 +4,7 @@ import os
 import time
 import shutil
 import struct
+import re
 
 
 def get_shader(model_file, submesh, all_file_info, name):
@@ -14,26 +15,38 @@ def get_shader(model_file, submesh, all_file_info, name):
     convert_hlsl(submesh.material, submesh.textures, shader_ref, model_file.uid, all_file_info, name)
 
 
-def get_decompiled_hlsl(shader_ref, uid):
-    gf.mkdir(f'C:/d2_model_temp/texture_models/{uid}/hlsl/')
+def get_shader_from_mat(material, textures, all_file_info, custom_dir):
+    if material.name in os.listdir(custom_dir):
+        return
+    shader = met.File(uid=material.fhex[0x2C8 * 2:0x2C8 * 2 + 8])
+    shader.get_file_from_uid()
+    shader_ref = f"{all_file_info[shader.name]['RefPKG'][2:]}-{all_file_info[shader.name]['RefID'][2:]}"
+    get_decompiled_hlsl(shader_ref, custom_dir)
+    convert_hlsl(material, textures, shader_ref, custom_dir, all_file_info)
+
+
+def get_decompiled_hlsl(shader_ref, custom_dir):
+    gf.mkdir(custom_dir)
     pkg_name = gf.get_pkg_name(shader_ref)
     os.system(f'start hlsl/decomp.exe -D C:/d2_output/{pkg_name}/{shader_ref}.bin')
     time.sleep(1)
-    shutil.move(f'C:/d2_output/{pkg_name}/{shader_ref}.hlsl', f'C:/d2_model_temp/texture_models/{uid}/hlsl/{shader_ref}.hlsl')
+    shutil.move(f'C:/d2_output/{pkg_name}/{shader_ref}.hlsl', f'{custom_dir}/{shader_ref}.hlsl')
     print(f'Decompiled and moved shader {shader_ref}.hlsl')
 
 
-def convert_hlsl(material, textures, shader_ref, uid, all_file_info, name):
+def convert_hlsl(material, textures, shader_ref, custom_dir, all_file_info, name=None):
     print(f'Material {material.name}')
     lines_to_write = []
 
     # Getting info from material
-    cbuffer1, cbuffer_length = get_cbuffer_from_file(material, all_file_info)
+    cbuffers = get_all_cbuffers_from_file(material, all_file_info)
+
 
     # Getting info from hlsl file
-    with open(f'C:/d2_model_temp/texture_models/{uid}/hlsl/{shader_ref}.hlsl', 'r') as h:
+    with open(f'{custom_dir}/{shader_ref}.hlsl', 'r') as h:
         text = h.readlines()
         instructions = get_instructions(text)
+        cbuffer_text = get_cbuffer_text(cbuffers, text)
         inputs, outputs = get_in_out(text, instructions)
         input_append1, input_append2 = get_inputs_append(inputs)
         texs = get_texs(text)
@@ -41,7 +54,8 @@ def convert_hlsl(material, textures, shader_ref, uid, all_file_info, name):
         tex_comments = get_tex_comments(textures)
         lines_to_write.append('#pragma once\n')
         lines_to_write.append(tex_comments)
-        lines_to_write.append(f'static float4 cb0[{cbuffer_length}] = \n' + '{\n' + f'{cbuffer1}\n' + '};\n')
+        lines_to_write.append(cbuffer_text)
+        # lines_to_write.append(f'static float4 cb0[{cbuffer_length}] = \n' + '{\n' + f'{cbuffer1}\n' + '};\n')
         lines_to_write.append(input_append1)
         lines_to_write.append('\n\nstruct shader {\nfloat4 main(\n')
         lines_to_write.append(params)
@@ -50,20 +64,60 @@ def convert_hlsl(material, textures, shader_ref, uid, all_file_info, name):
         lines_to_write.append(instructions)
         lines_to_write.append('}\n};\n\nshader s;\n\n' + f'return s.main({params_end}, tx);')
 
-    for i in range(3):
-        with open(f'C:/d2_model_temp/texture_models/{uid}/hlsl/{name}_{shader_ref}_o{i}.usf', 'w') as u:
+    # Change to 3 for all outputs, currently just want base colour
+    for i in range(1):
+        if name:
+            open_dir = f'{custom_dir}/{name}_{shader_ref}_o{i}.usf'
+        else:
+            open_dir = f'{custom_dir}/{material.name}_o{i}.usf'
+        with open(open_dir, 'w') as u:
         # with open(f'hlsl/.usf', 'w') as u:
             # TODO convert to an array write, faster
             for line in lines_to_write:
                 if 'return' in line:
                     line = line.replace('return;', f'return o{i};')
                 u.write(line)
-            print('Wrote to file')
+            print(f'Wrote to usf {open_dir}')
         print('')
+
+
+def get_cbuffer_text(cbuffers, text):
+    ret = ''
+    # This all assumes there won't be two cbuffers of the same length
+    cbuffer_to_write = {}
+    text_cbuffers = {}
+    read = False
+    for line in text:
+        if 'cbuffer' in line:
+            read = True
+        if read:
+            if 'register' in line:
+                name = line.split(' ')[1]
+            elif 'float4' in line:
+                size = int(line.split('[')[1].split(']')[0])
+            elif '}' in line:
+                text_cbuffers[size] = name
+                read = False
+    for length, data in cbuffers.items():
+        if length in text_cbuffers.keys():
+            name = text_cbuffers[length]
+            cbuffer_to_write[name] = [data, length]
+
+    # As we don't know where to find cb12 yet
+    if 'cb12' in text_cbuffers.values():
+        cbuffer_to_write['cb12'] = ['float4(1,1,1,1),float4(1,1,1,1),float4(1,1,1,1),float4(1,1,1,1),float4(1,1,1,1),float4(1,1,1,1),float4(1,1,1,1),float4(1,1,1,1),', 8]
+
+    for name, packed in cbuffer_to_write.items():
+        data = packed[0]
+        length = packed[1]
+        ret += f'static float4 {name}[{length}] = \n' + '{\n' + f'{data}\n' + '};\n'
+
+    return ret
 
 
 def get_tex_comments(textures):
     comments = ''
+    comments += f'//{textures}\n'
     for i, t in enumerate(textures):
         comments += f'// t{i} is {t}\n'
     return comments
@@ -154,24 +208,28 @@ def get_in_out(text, instructions):
                     inputs.append(line[:-1])
 
 
-def get_cbuffer_from_file(material, all_file_info):
-    if material.fhex[0x34C*2:0x34C*2+8] == 'FFFFFFFF':
-        # No cbuffer file so trying to see if theres a cbuffer within the file instead
-        offset_9000 = material.fhex.find('90008080')
-        if int(gf.get_flipped_hex(material.fhex[offset_9000-16:offset_9000-8], 8), 16) != 1:
-            if 'BD9F8080' not in material.fhex[offset_9000:]:
-                # Assuming that it's always at the end of the file
-                return process_cbuffer_data(material.fhex[offset_9000+16:])
-            else:
-                raise Exception('Cbuffer not end of file')
-        else:
-            raise Exception('No cbuffer found.')
-    else:
+def get_all_cbuffers_from_file(material, all_file_info):
+    cbuffers = {}
+    # Read cbuffer from file if there
+    if material.fhex[0x34C*2:0x34C*2+8] != 'FFFFFFFF':
         cbuffer_header = met.File(uid=material.fhex[0x34C*2:0x34C*2+8])
         cbuffer_header.get_file_from_uid()
         cbuffer_ref = met.File(name=f"{all_file_info[cbuffer_header.name]['RefPKG'][2:]}-{all_file_info[cbuffer_header.name]['RefID'][2:]}")
         cbuffer_ref.get_hex_data()
-        return process_cbuffer_data(cbuffer_ref.fhex)
+        data, length = process_cbuffer_data(cbuffer_ref.fhex)
+        cbuffers[length] = data
+
+    # Reading from mat file as well in case there's more cbuffers
+    offsets = [m.start() for m in re.finditer('90008080', material.fhex)]
+    # If cbuffer is a real cbuffer we'll read it and output it
+    for offset in offsets:
+        count = int(gf.get_flipped_hex(material.fhex[offset-16:offset-8], 8), 16)
+        if count != 1:
+            data, length = process_cbuffer_data(material.fhex[offset+16:offset+16+32*count])
+            cbuffers[length] = data
+        # else:
+            # raise Exception('No cbuffer found.')
+    return cbuffers
 
 
 def process_cbuffer_data(fhex):

@@ -590,6 +590,34 @@ def get_submesh_textures(model_file: ModelFile, submesh: Submesh, custom_dir=Fal
                 imager.get_image_from_file(f'C:/d2_output/{gf.get_pkg_name(img)}/{img}.bin', f'C:/d2_model_temp/texture_models/{model_file.uid}/textures/')
 
 
+def get_material_textures(material, custom_dir):
+    material.get_hex_data()
+    offset = material.fhex.find('11728080')
+    count = int(gf.get_flipped_hex(material.fhex[offset-16:offset-8], 8), 16)
+    # Arbritrary
+    if count < 0 or count > 100:
+        return []
+    image_indices = [gf.get_file_from_hash(material.fhex[offset+16+8*(2*i):offset+16+8*(2*i)+8]) for i in range(count)]
+    images = [gf.get_file_from_hash(material.fhex[offset+16+8+8*(2*i):offset+16+8*(2*i)+16]) for i in range(count)]
+    if len(images) == 0:
+        return []
+    for img in images:
+        if custom_dir:
+            gf.mkdir(f'{custom_dir}/')
+            if not os.path.exists(f'{custom_dir}/{img}.png'):
+                if img == 'FBFF-1FFF':
+                    continue
+                imager.get_image_from_file(f'C:/d2_output/{gf.get_pkg_name(img)}/{img}.bin', f'{custom_dir}/')
+        # else:
+        #     gf.mkdir(f'C:/d2_model_temp/texture_models/{model_file.uid}/textures/')
+        #     if not os.path.exists(f'C:/d2_model_temp/texture_models/{model_file.uid}/textures/{img}.png'):
+        #         imager.get_image_from_file(f'C:/d2_output/{gf.get_pkg_name(img)}/{img}.bin', f'C:/d2_model_temp/texture_models/{model_file.uid}/textures/')
+    return images
+
+def get_shader_file(material, textures, all_file_info, custom_dir):
+    shaders.get_shader_from_mat(material, textures, all_file_info, custom_dir)
+
+
 def create_mesh(fbx_map, pos_verts_data, faces_data, name):
     mesh = fbx.FbxMesh.Create(fbx_map.scene, name)
     controlpoints = [fbx.FbxVector4(-x[0]*100, x[2]*100, x[1]*100) for x in pos_verts_data]
@@ -659,4 +687,4 @@ if __name__ == '__main__':
     all_file_info = {x[0]: dict(zip(['RefID', 'RefPKG', 'FileType'], x[1:])) for x in
                      pkg_db.get_entries_from_table('Everything', 'FileName, RefID, RefPKG, FileType')}
 
-    get_model('6811C780')
+    get_model('86BFFE80')
