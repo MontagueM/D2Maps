@@ -35,19 +35,20 @@ def convert_hlsl(material, textures, shader_ref, uid, all_file_info, name):
         text = h.readlines()
         instructions = get_instructions(text)
         inputs, outputs = get_in_out(text, instructions)
-        input_append = get_inputs_append(inputs)
+        input_append1, input_append2 = get_inputs_append(inputs)
         texs = get_texs(text)
         params, params_end = get_params(texs)
         tex_comments = get_tex_comments(textures)
         lines_to_write.append('#pragma once\n')
         lines_to_write.append(tex_comments)
         lines_to_write.append(f'static float4 cb0[{cbuffer_length}] = \n' + '{\n' + f'{cbuffer1}\n' + '};\n')
-        lines_to_write.append(input_append)
+        lines_to_write.append(input_append1)
         lines_to_write.append('\n\nstruct shader {\nfloat4 main(\n')
         lines_to_write.append(params)
+        lines_to_write.append(input_append2)
         lines_to_write.append(f'    float4 {",".join(outputs)};\n')
         lines_to_write.append(instructions)
-        lines_to_write.append('}\n};\n\nshader s;\n\n' + f'return s.main({params_end});')
+        lines_to_write.append('}\n};\n\nshader s;\n\n' + f'return s.main({params_end}, tx);')
 
     for i in range(3):
         with open(f'C:/d2_model_temp/texture_models/{uid}/hlsl/{name}_{shader_ref}_o{i}.usf', 'w') as u:
@@ -69,7 +70,8 @@ def get_tex_comments(textures):
 
 
 def get_inputs_append(inputs):
-    input_append = ''
+    input_append1 = ''
+    input_append2 = ''
     for inp in inputs:
         inps = inp.split(' ')
         if 'TEXCOORD' in inp:
@@ -77,12 +79,13 @@ def get_inputs_append(inputs):
                 write = f'\nstatic {inps[2]} {inps[3]} = ' + '{1, 1, 1, 1};\n'
             elif 'float3' in inp:
                 write = f'\nstatic {inps[2]} {inps[3]} = ' + '{1, 1, 1};\n'
+            input_append2 += f'    {inps[3]}.xy = {inps[3]}.xy * tx;\n'
         elif 'SV_isFrontFace0' in inp:
             write = f'\nstatic {inps[2]} {inps[3]} = 1;\n'
         else:
             raise Exception('Input not recognised.')
-        input_append += write
-    return input_append
+        input_append1 += write
+    return input_append1, input_append2
 
 
 def get_params(texs):
@@ -91,7 +94,7 @@ def get_params(texs):
     texs = texs[::-1]
     for t in texs:
         if texs[-1] == t:
-            params += f'  float4 {t})\n' + '{\n'
+            params += f'  float4 {t},\n   float2 tx)\n' + '{\n'
             params_end += t
         else:
             params += f'  float4 {t},\n'
@@ -130,7 +133,6 @@ def get_instructions(text):
             care = True
         elif care and '{' in line:
             read = True
-
 
 
 def get_in_out(text, instructions):

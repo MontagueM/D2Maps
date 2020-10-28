@@ -592,7 +592,7 @@ def get_submesh_textures(model_file: ModelFile, submesh: Submesh, custom_dir=Fal
 
 def create_mesh(fbx_map, pos_verts_data, faces_data, name):
     mesh = fbx.FbxMesh.Create(fbx_map.scene, name)
-    controlpoints = [fbx.FbxVector4(x[0], x[1], x[2]) for x in pos_verts_data]
+    controlpoints = [fbx.FbxVector4(-x[0]*100, x[2]*100, x[1]*100) for x in pos_verts_data]
     for i, p in enumerate(controlpoints):
         mesh.SetControlPointAt(p, i)
     for face in faces_data:
@@ -659,4 +659,4 @@ if __name__ == '__main__':
     all_file_info = {x[0]: dict(zip(['RefID', 'RefPKG', 'FileType'], x[1:])) for x in
                      pkg_db.get_entries_from_table('Everything', 'FileName, RefID, RefPKG, FileType')}
 
-    get_model('4FF55681')
+    get_model('75465881')
