@@ -119,7 +119,7 @@ def get_instructions(text):
         if read:
             if 'Sample' in line:
                 equal = line.split('=')[0]
-                to_sample = line.split(' ')[4].split('.')[0]
+                to_sample = [x for x in line.split(' ') if x != ''][2].split('.')[0]
                 samplestate = int(line.split('(')[1][1])
                 uv = line.split(', ')[1].split(')')[0]
                 dot_after = line.split(').')[1]
