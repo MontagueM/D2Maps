@@ -215,8 +215,11 @@ def shift_faces_down(faces_data):
 
 def get_shader_info(d2map: Map):
     for material in d2map.material_files:
-        textures = met.get_material_textures(material, custom_dir=f'C:/d2_maps/{d2map.pkg_name}_fbx/textures/')
-        met.get_shader_file(material, textures, all_file_info, custom_dir=f'C:/d2_maps/{d2map.pkg_name}_fbx/shaders/')
+        if material.name == '0222-0CAF':
+            print('')
+        cbuffer_offsets, texture_offset = met.get_mat_tables(material)
+        textures = met.get_material_textures(material, texture_offset, custom_dir=f'C:/d2_maps/{d2map.pkg_name}_fbx/textures/')
+        met.get_shader_file(material, textures, cbuffer_offsets, all_file_info, custom_dir=f'C:/d2_maps/{d2map.pkg_name}_fbx/shaders/')
 
 
 def add_model_to_fbx_map(d2map: Map, model_file: met.ModelFile, submesh: met.Submesh, name):

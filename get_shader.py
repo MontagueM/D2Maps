@@ -15,14 +15,14 @@ def get_shader(model_file, submesh, all_file_info, name):
     convert_hlsl(submesh.material, submesh.textures, shader_ref, model_file.uid, all_file_info, name)
 
 
-def get_shader_from_mat(material, textures, all_file_info, custom_dir):
-    if material.name in os.listdir(custom_dir):
-        return
+def get_shader_from_mat(material, textures, cbuffer_offsets, all_file_info, custom_dir):
+    # if material.name in os.listdir(custom_dir):
+    #     return
     shader = met.File(uid=material.fhex[0x2C8 * 2:0x2C8 * 2 + 8])
     shader.get_file_from_uid()
     shader_ref = f"{all_file_info[shader.name]['RefPKG'][2:]}-{all_file_info[shader.name]['RefID'][2:]}"
     get_decompiled_hlsl(shader_ref, custom_dir)
-    convert_hlsl(material, textures, shader_ref, custom_dir, all_file_info)
+    convert_hlsl(material, textures, cbuffer_offsets, shader_ref, custom_dir, all_file_info)
 
 
 def get_decompiled_hlsl(shader_ref, custom_dir):
@@ -34,12 +34,12 @@ def get_decompiled_hlsl(shader_ref, custom_dir):
     print(f'Decompiled and moved shader {shader_ref}.hlsl')
 
 
-def convert_hlsl(material, textures, shader_ref, custom_dir, all_file_info, name=None):
+def convert_hlsl(material, textures, cbuffer_offsets, shader_ref, custom_dir, all_file_info, name=None):
     print(f'Material {material.name}')
     lines_to_write = []
 
     # Getting info from material
-    cbuffers = get_all_cbuffers_from_file(material, all_file_info)
+    cbuffers = get_all_cbuffers_from_file(material, cbuffer_offsets, all_file_info)
 
 
     # Getting info from hlsl file
@@ -182,7 +182,10 @@ def get_instructions(text):
             if 'return;' in line:
                 ret = ''.join(instructions)
                 # cmp seems broken
-                return ret.replace('cmp', '')
+                ret = ret.replace('cmp', '')
+                # discard doesnt work in ue4 hlsl
+                ret = ret.replace('discard', '{ o0.w = 0; }')
+                return ret
         elif 'void main(' in line:
             care = True
         elif care and '{' in line:
@@ -208,7 +211,7 @@ def get_in_out(text, instructions):
                     inputs.append(line[:-1])
 
 
-def get_all_cbuffers_from_file(material, all_file_info):
+def get_all_cbuffers_from_file(material, cbuffer_offsets, all_file_info):
     cbuffers = {}
     # Read cbuffer from file if there
     if material.fhex[0x34C*2:0x34C*2+8] != 'FFFFFFFF':
@@ -220,9 +223,10 @@ def get_all_cbuffers_from_file(material, all_file_info):
         cbuffers[length] = data
 
     # Reading from mat file as well in case there's more cbuffers
-    offsets = [m.start() for m in re.finditer('90008080', material.fhex)]
+    # offsets = [m.start() for m in re.finditer('90008080', material.fhex)]
     # If cbuffer is a real cbuffer we'll read it and output it
-    for offset in offsets:
+    for offset in cbuffer_offsets:
+        offset += 16
         count = int(gf.get_flipped_hex(material.fhex[offset-16:offset-8], 8), 16)
         if count != 1:
             data, length = process_cbuffer_data(material.fhex[offset+16:offset+16+32*count])

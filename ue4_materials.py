@@ -3,11 +3,11 @@ import unreal
 # import ast
 
 
-def get_all_materials(path):
-    for file in os.listdir(path):
+def get_all_materials():
+    for file in os.listdir(top_path + specific_path + '/shaders/'):
         # Currently only doing base
         if '.usf' in file and 'o0' in file:
-            modify_material(path, file)
+            modify_material(top_path + specific_path + '/shaders/', file)
             # return
 
 
@@ -21,9 +21,9 @@ def modify_material(path, usf):
         # textures = ast.literal_eval(f[1][2:])
 
     print(material_name)
-    asset = '/Game/' + material_name
+    asset = game_path + specific_path + material_name
     matname = unreal.Paths.get_base_filename(asset)
-    matpath = '/Game/' + matname
+    matpath = game_path + specific_path + matname
     # for asset in unreal.EditorAssetLibrary.list_assets('/Game/'):
     asset_data = unreal.EditorAssetLibrary.find_asset_data(matpath)
     if asset_data.asset_class == "Material":
@@ -51,7 +51,7 @@ def add_cust_expr(material, usf, textures):
     custexpr = unreal.MaterialEditingLibrary.create_material_expression(material,
                                                                         unreal.MaterialExpressionCustom,
                                                                         -50, 0)
-    code = '#include "C:/Users/monta/Documents/Unreal Projects/MapsShaderTests/Content/shaders/' + usf + '"\nreturn 0;'
+    code = '#include "' + top_path + specific_path + '/shaders/' + usf + '"\nreturn 0;'
     inputs = []
     for i in range(len(textures)):
         ci = unreal.CustomInput()
@@ -73,11 +73,16 @@ def add_tex_samples(material, textures):
                                                                              unreal.MaterialExpressionTextureSample,
                                                                              -300, 300 * i)
         ts_TextureName = unreal.Paths.get_base_filename(tex + '.png')
-        ts_TextureUePath = '/Game/Textures/' + ts_TextureName
+        ts_TextureUePath = game_path + specific_path + '/Textures/' + ts_TextureName
         ts_LoadedTexture = unreal.EditorAssetLibrary.load_asset(ts_TextureUePath)
         texsample.set_editor_property('texture', ts_LoadedTexture)
         texsamples.append(texsample)
     return texsamples
 
 # add_tex_samples()
-get_all_materials('C:/Users/monta/Documents/Unreal Projects/MapsShaderTests/Content/shaders/')
+# top_path = 'C:/Users/monta/Documents/Unreal Projects/MapsShaderTests/Content'
+top_path = 'C:/Users/monta/Documents/Unreal Projects/ShaderTests/Content/'
+
+game_path = '/Game'
+specific_path = '/0A49EB80/'
+get_all_materials()

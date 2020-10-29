@@ -60,6 +60,7 @@ class ModelFile(File):
         super(ModelFile, self).__init__(uid=uid)
         self.models = []
         self.material_files = []
+        self.materials = {}
         self.model_data_file = File(name=self.get_model_data_file())
         self.model_file_hex = ''
         self.model_data_hex = ''
@@ -545,23 +546,48 @@ def export_fbx(model_file: ModelFile, submesh: Submesh, name):
     model = pfb.Model()
     node, mesh = create_mesh(model, submesh.pos_verts, submesh.faces, name)
     if submesh.material:
-        get_submesh_textures(model_file, submesh)
-        shaders.get_shader(model_file, submesh, all_file_info, name)
+        # get_submesh_textures(model_file, submesh)
+        # shaders.get_shader(model_file, submesh, all_file_info, name)
+        apply_shader(model, model_file, submesh, node)
         print(f'submesh {name} has mat file {submesh.material.name} with textures {submesh.textures}')
         if submesh.diffuse:
             if not mesh.GetLayer(0):
                 mesh.CreateLayer()
             layer = mesh.GetLayer(0)
 
-            apply_diffuse(model, submesh.diffuse, f'C:/d2_model_temp/texture_models/{model_file.uid}/textures/{submesh.diffuse}.png', node)
+            # apply_diffuse(model, submesh.diffuse, f'C:/d2_model_temp/texture_models/{model_file.uid}/textures/{submesh.diffuse}.png', node)
 
             create_uv(mesh, submesh.diffuse, submesh.uv_verts, layer)
-            set_normals(mesh, submesh.diffuse, submesh.norm_verts, layer)
+            # set_normals(mesh, submesh.diffuse, submesh.norm_verts, layer)
             node.SetShadingMode(fbx.FbxNode.eTextureShading)
     model.scene.GetRootNode().AddChild(node)
 
+    get_shader_info(model_file)
+
     model.export(save_path=f'C:/d2_model_temp/texture_models/{model_file.uid}/{name}.fbx', ascii_format=False)
     print('Exported')
+
+
+def get_shader_info(model_file):
+    for material in model_file.material_files:
+        if material.name == '0222-0CAF':
+            print('')
+        cbuffer_offsets, texture_offset = get_mat_tables(material)
+        textures = get_material_textures(material, texture_offset, custom_dir=f'C:/d2_model_temp/texture_models/{model_file.uid}/textures/')
+        get_shader_file(material, textures, cbuffer_offsets, all_file_info, custom_dir=f'C:/d2_model_temp/texture_models/{model_file.uid}/shaders/')
+
+
+def apply_shader(model, model_file, submesh: Submesh, node):
+    lMaterialName = f'{submesh.material.name}'
+    if lMaterialName in model_file.materials.keys():
+        node.AddMaterial(model_file.materials[lMaterialName])
+        return
+    lMaterial = fbx.FbxSurfacePhong.Create(model.scene, lMaterialName)
+    model_file.materials[lMaterialName] = lMaterial
+    model_file.material_files.append(File(name=lMaterialName))
+    # lMaterial.DiffuseFactor.Set(1)
+    lMaterial.ShadingModel.Set('Phong')
+    node.AddMaterial(lMaterial)
 
 
 def get_submesh_textures(model_file: ModelFile, submesh: Submesh, custom_dir=False):
@@ -590,15 +616,42 @@ def get_submesh_textures(model_file: ModelFile, submesh: Submesh, custom_dir=Fal
                 imager.get_image_from_file(f'C:/d2_output/{gf.get_pkg_name(img)}/{img}.bin', f'C:/d2_model_temp/texture_models/{model_file.uid}/textures/')
 
 
-def get_material_textures(material, custom_dir):
+def get_mat_tables(material):
     material.get_hex_data()
-    offset = material.fhex.find('11728080')
-    count = int(gf.get_flipped_hex(material.fhex[offset-16:offset-8], 8), 16)
+    cbuffers = []
+    textures = -1
+
+    texture_offset = 0x2D8*2
+    table_offset = texture_offset + int(gf.get_flipped_hex(material.fhex[texture_offset:texture_offset + 8], 8), 16) * 2
+    # table_count = int(gf.get_flipped_hex(material.fhex[table_offset:table_offset+8], 8), 16)
+    table_type = material.fhex[table_offset + 16:table_offset + 24]
+    if table_type == '11728080':
+        textures = table_offset
+
+    start_offset = 0x2F0*2
+    for i in range(6):
+        current_offset = start_offset + 32*i
+        table_offset = current_offset + int(gf.get_flipped_hex(material.fhex[current_offset:current_offset+8], 8), 16)*2
+        # table_count = int(gf.get_flipped_hex(material.fhex[table_offset:table_offset+8], 8), 16)
+        table_type = material.fhex[table_offset+16:table_offset+24]
+        if table_type == '90008080':
+            cbuffers.append(table_offset)
+
+    if textures == -1:
+        raise Exception('Texture offset incorrect')
+
+    return cbuffers, textures
+
+
+def get_material_textures(material, texture_offset, custom_dir):
+    material.get_hex_data()
+    texture_offset += 16
+    count = int(gf.get_flipped_hex(material.fhex[texture_offset-16:texture_offset-8], 8), 16)
     # Arbritrary
     if count < 0 or count > 100:
         return []
-    image_indices = [gf.get_file_from_hash(material.fhex[offset+16+8*(2*i):offset+16+8*(2*i)+8]) for i in range(count)]
-    images = [gf.get_file_from_hash(material.fhex[offset+16+8+8*(2*i):offset+16+8*(2*i)+16]) for i in range(count)]
+    image_indices = [gf.get_file_from_hash(material.fhex[texture_offset+16+8*(2*i):texture_offset+16+8*(2*i)+8]) for i in range(count)]
+    images = [gf.get_file_from_hash(material.fhex[texture_offset+16+8+8*(2*i):texture_offset+16+8*(2*i)+16]) for i in range(count)]
     if len(images) == 0:
         return []
     for img in images:
@@ -614,8 +667,8 @@ def get_material_textures(material, custom_dir):
         #         imager.get_image_from_file(f'C:/d2_output/{gf.get_pkg_name(img)}/{img}.bin', f'C:/d2_model_temp/texture_models/{model_file.uid}/textures/')
     return images
 
-def get_shader_file(material, textures, all_file_info, custom_dir):
-    shaders.get_shader_from_mat(material, textures, all_file_info, custom_dir)
+def get_shader_file(material, textures, cbuffer_offsets, all_file_info, custom_dir):
+    shaders.get_shader_from_mat(material, textures, cbuffer_offsets, all_file_info, custom_dir)
 
 
 def create_mesh(fbx_map, pos_verts_data, faces_data, name):
@@ -687,4 +740,4 @@ if __name__ == '__main__':
     all_file_info = {x[0]: dict(zip(['RefID', 'RefPKG', 'FileType'], x[1:])) for x in
                      pkg_db.get_entries_from_table('Everything', 'FileName, RefID, RefPKG, FileType')}
 
-    get_model('86BFFE80')
+    get_model('0A49EB80')
