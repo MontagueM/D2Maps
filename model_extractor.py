@@ -637,8 +637,8 @@ def get_mat_tables(material):
         if table_type == '90008080':
             cbuffers.append(table_offset)
 
-    if textures == -1:
-        raise Exception('Texture offset incorrect')
+    # if textures == -1:
+    #     raise Exception('Texture offset incorrect')
 
     return cbuffers, textures
 
@@ -646,11 +646,13 @@ def get_mat_tables(material):
 def get_material_textures(material, texture_offset, custom_dir):
     material.get_hex_data()
     texture_offset += 16
+    if texture_offset == 15:
+        return []
     count = int(gf.get_flipped_hex(material.fhex[texture_offset-16:texture_offset-8], 8), 16)
     # Arbritrary
     if count < 0 or count > 100:
         return []
-    image_indices = [gf.get_file_from_hash(material.fhex[texture_offset+16+8*(2*i):texture_offset+16+8*(2*i)+8]) for i in range(count)]
+    # image_indices = [gf.get_file_from_hash(material.fhex[texture_offset+16+8*(2*i):texture_offset+16+8*(2*i)+8]) for i in range(count)]
     images = [gf.get_file_from_hash(material.fhex[texture_offset+16+8+8*(2*i):texture_offset+16+8*(2*i)+16]) for i in range(count)]
     if len(images) == 0:
         return []
@@ -740,4 +742,4 @@ if __name__ == '__main__':
     all_file_info = {x[0]: dict(zip(['RefID', 'RefPKG', 'FileType'], x[1:])) for x in
                      pkg_db.get_entries_from_table('Everything', 'FileName, RefID, RefPKG, FileType')}
 
-    get_model('0A49EB80')
+    get_model('E12ED80')

@@ -323,7 +323,7 @@ def unpack_folder(pkg_name):
             # a = [x.split('.')[0] for x in os.listdir('C:\d2_maps/orphaned_0932_fbx/')]
             # if file_name in [x.split('.')[0] for x in os.listdir(f'C:\d2_maps/{pkg_name}_fbx/')]:
             #     continue
-            if '1A4A' not in file_name:
+            if '0722' not in file_name:
                 continue
             print(f'Unpacking {file_name}')
             unpack_map(file_name, pkg_name)

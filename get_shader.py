@@ -16,8 +16,9 @@ def get_shader(model_file, submesh, all_file_info, name):
 
 
 def get_shader_from_mat(material, textures, cbuffer_offsets, all_file_info, custom_dir):
-    # if material.name in os.listdir(custom_dir):
-    #     return
+    # Overwrite
+    if material.name in os.listdir(custom_dir):
+        return
     shader = met.File(uid=material.fhex[0x2C8 * 2:0x2C8 * 2 + 8])
     shader.get_file_from_uid()
     shader_ref = f"{all_file_info[shader.name]['RefPKG'][2:]}-{all_file_info[shader.name]['RefID'][2:]}"
@@ -65,7 +66,7 @@ def convert_hlsl(material, textures, cbuffer_offsets, shader_ref, custom_dir, al
         lines_to_write.append('}\n};\n\nshader s;\n\n' + f'return s.main({params_end}, tx);')
 
     # Change to 3 for all outputs, currently just want base colour
-    for i in range(1):
+    for i in range(3):
         if name:
             open_dir = f'{custom_dir}/{name}_{shader_ref}_o{i}.usf'
         else:
