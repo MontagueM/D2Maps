@@ -49,7 +49,7 @@ def connect_nodes(mat, texsamples, custexprs):
         unreal.MaterialEditingLibrary.connect_material_expressions(texcoord, '', custexpr, 'tx')
 
     # Connecting all the final outputs to the properties
-    # unreal.MaterialEditingLibrary.connect_material_property(, '', unreal.MaterialProperty.MP_BASE_COLOR)
+    unreal.MaterialEditingLibrary.connect_material_property(custexprs[0], '', unreal.MaterialProperty.MP_BASE_COLOR)
     # unreal.MaterialEditingLibrary.connect_material_property(, '', unreal.MaterialProperty.MP_METALLIC)
     # unreal.MaterialEditingLibrary.connect_material_property(, '', unreal.MaterialProperty.MP_NORMAL)
     # unreal.MaterialEditingLibrary.connect_material_property(, '', unreal.MaterialProperty.MP_AMBIENT_OCCLUSION)
@@ -97,6 +97,6 @@ top_path = 'C:/Users/monta/Documents/Unreal Projects/MapsShaderTests/Content/'
 
 game_path = '/Game/'
 # specific_path = '/0A49EB80/'
-specific_path = ''
+specific_path = '0688-01E9/'
 done_usfs = []
 get_all_materials()

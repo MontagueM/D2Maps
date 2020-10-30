@@ -17,6 +17,7 @@ def get_shader(model_file, submesh, all_file_info, name):
 
 def get_shader_from_mat(material, textures, cbuffer_offsets, all_file_info, custom_dir):
     # Overwrite
+    gf.mkdir(custom_dir)
     if material.name in os.listdir(custom_dir):
         return
     shader = met.File(uid=material.fhex[0x2C8 * 2:0x2C8 * 2 + 8])
@@ -107,6 +108,10 @@ def get_cbuffer_text(cbuffers, text):
     # As we don't know where to find cb12 yet
     if 'cb12' in text_cbuffers.values():
         cbuffer_to_write['cb12'] = ['float4(1,1,1,1),float4(1,1,1,1),float4(1,1,1,1),float4(1,1,1,1),float4(1,1,1,1),float4(1,1,1,1),float4(1,1,1,1),float4(1,1,1,1),', 8]
+
+    if 'cb13' in text_cbuffers.values():
+        cbuffer_to_write['cb13'] = ['float4(1,1,1,1),float4(1,1,1,1),float4(1,1,1,1),float4(1,1,1,1),float4(1,1,1,1),float4(1,1,1,1),float4(1,1,1,1),float4(1,1,1,1),', 8]
+
 
     for name, packed in cbuffer_to_write.items():
         data = packed[0]
