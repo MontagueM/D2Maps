@@ -669,6 +669,7 @@ def get_material_textures(material, texture_offset, custom_dir):
         #         imager.get_image_from_file(f'C:/d2_output/{gf.get_pkg_name(img)}/{img}.bin', f'C:/d2_model_temp/texture_models/{model_file.uid}/textures/')
     return images
 
+
 def get_shader_file(material, textures, cbuffer_offsets, all_file_info, custom_dir):
     shaders.get_shader_from_mat(material, textures, cbuffer_offsets, all_file_info, custom_dir)
 

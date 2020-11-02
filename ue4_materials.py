@@ -7,8 +7,9 @@ def get_all_materials():
     for file in os.listdir(top_path + specific_path + '/shaders/'):
         # Currently only doing base
         if '.usf' in file and 'o0' in file and file[:-7] not in done_usfs:
-            modify_material(top_path + specific_path + '/shaders/', file)
-            done_usfs.append([file[:-7]])
+            if '03AB-0C21' in file or '03AB-0C45' in file or '03AB-0EB5' in file:
+                modify_material(top_path + specific_path + '/shaders/', file)
+                done_usfs.append([file[:-7]])
             # return
 
 
@@ -97,6 +98,6 @@ top_path = 'C:/Users/monta/Documents/Unreal Projects/MapsShaderTests/Content/'
 
 game_path = '/Game/'
 # specific_path = '/0A49EB80/'
-specific_path = '0688-01E9/'
+specific_path = '0682-1BF1/'
 done_usfs = []
 get_all_materials()

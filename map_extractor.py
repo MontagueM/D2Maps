@@ -120,14 +120,10 @@ def get_model_refs(d2map: Map):
 def get_copy_counts(d2map: Map):
     entries_hex = [d2map.copy_counts_hex[i:i + 8 * 2] for i in range(0, len(d2map.copy_counts_hex), 8 * 2)]
     entries = []
-    count_dict = {}
     for e in entries_hex:
         entries.append(get_header(e, CountEntry()))
     for entry in entries:
-        if entry.ModelRef not in count_dict.keys():
-            count_dict[entry.ModelRef] = 0
-        count_dict[entry.ModelRef] += entry.Count
-    _, d2map.copy_counts = zip(*sorted(zip(count_dict.keys(), count_dict.values())))
+        d2map.copy_counts.append({'UID': d2map.model_refs[entry.ModelRef], 'Count': entry.Count})
     print('')
 
 
@@ -149,14 +145,16 @@ def get_transforms_array(model_refs, copy_counts, rotations, location, map_scale
 
 def compute_coords(d2map: Map):
     nums = 0
-    for i, model_ref in enumerate(d2map.model_refs):
-        print(f'Getting obj {i + 1}/{len(d2map.model_refs)} {model_ref} {nums}')
+    for i, data in enumerate(d2map.copy_counts):
+        model_ref = data['UID']
+        copy_count = data['Count']
+        print(f'Getting obj {i + 1}/{len(d2map.copy_counts)} {model_ref} {nums}')
 
         model_file = met.ModelFile(uid=model_ref)
         model_file.get_model_data_file()
         ret = met.get_model_data(model_file, all_file_info)
         if not ret:
-            nums += d2map.copy_counts[i]
+            nums += copy_count
             continue
         met.get_submeshes(model_file)
         met.get_materials(model_file)
@@ -164,7 +162,7 @@ def compute_coords(d2map: Map):
         """Could make more efficient by just duping models instead of remaking them here."""
 
         max_vert_used = 0
-        for copy_count in range(d2map.copy_counts[i]):
+        for copy_count in range(copy_count):
             for j, model in enumerate(model_file.models):
                 for k, submesh in enumerate(model.submeshes):
                     if submesh.type == 769 or submesh.type == 770 or submesh.type == 778:
@@ -228,7 +226,7 @@ def add_model_to_fbx_map(d2map: Map, model_file: met.ModelFile, submesh: met.Sub
     if not mesh.GetLayer(0):
         mesh.CreateLayer()
     layer = mesh.GetLayer(0)
-    apply_shader(d2map, submesh, node)
+    # apply_shader(d2map, submesh, node)
     # apply_diffuse(d2map, submesh, node)
     create_uv(mesh, name, submesh, layer)
     node.SetShadingMode(fbx.FbxNode.eTextureShading)
@@ -323,8 +321,8 @@ def unpack_folder(pkg_name):
             # a = [x.split('.')[0] for x in os.listdir('C:\d2_maps/orphaned_0932_fbx/')]
             # if file_name in [x.split('.')[0] for x in os.listdir(f'C:\d2_maps/{pkg_name}_fbx/')]:
             #     continue
-            if '01E9' not in file_name:
-                continue
+            # if '031D' not in file_name:
+            #     continue
             print(f'Unpacking {file_name}')
             unpack_map(file_name, pkg_name)
 
@@ -335,4 +333,4 @@ if __name__ == '__main__':
     pkg_db.start_db_connection()
     all_file_info = {x[0]: dict(zip(['RefID', 'RefPKG', 'FileType'], x[1:])) for x in
                      pkg_db.get_entries_from_table('Everything', 'FileName, RefID, RefPKG, FileType')}
-    unpack_folder('penumbra_0688')
+    unpack_folder('fleet_039a')
