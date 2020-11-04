@@ -599,6 +599,7 @@ def get_submesh_textures(model_file: ModelFile, submesh: Submesh, custom_dir=Fal
         return
     image_indices = [gf.get_file_from_hash(submesh.material.fhex[offset+16+8*(2*i):offset+16+8*(2*i)+8]) for i in range(count)]
     images = [gf.get_file_from_hash(submesh.material.fhex[offset+16+8+8*(2*i):offset+16+8*(2*i)+16]) for i in range(count)]
+    # _, images = zip(*sorted(zip(image_indices, images)))
     if len(images) == 0:
         return
     submesh.diffuse = images[0]

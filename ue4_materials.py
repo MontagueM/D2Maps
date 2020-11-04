@@ -4,26 +4,32 @@ import unreal
 
 
 def get_all_materials():
-    for file in os.listdir(top_path + specific_path + '/shaders/'):
-        # Currently only doing base
-        if '.usf' in file and 'o0' in file and file[:-7] not in done_usfs:
-            if '03AB-0C21' in file or '03AB-0C45' in file or '03AB-0EB5' in file:
-                modify_material(top_path + specific_path + '/shaders/', file)
-                done_usfs.append([file[:-7]])
+    for asset in unreal.EditorAssetLibrary.list_assets(game_path + specific_path):
+        asset_data = unreal.EditorAssetLibrary.find_asset_data(asset)
+        if asset_data.asset_class == "Material":
+            modify_material(asset)
+    # for file in os.listdir(top_path + specific_path + '/shaders/'):
+    #     # Currently only doing base
+    #     if '.usf' in file and 'o0' in file and file[:-7] not in done_usfs:
+    #         # if '03AB-0C21' in file or '03AB-0C45' in file or '03AB-0EB5' in file:
+    #         modify_material(top_path + specific_path + '/shaders/', file)
+    #         done_usfs.append([file[:-7]])
             # return
 
 
-def modify_material(path, usf):
-    material_name = usf[:-7]
-    with open(path + usf) as f:
+def modify_material(asset):
+    usf = asset.split('.')[-1].split('_')[0] + '_o0.usf'
+    if usf in os.listdir(top_path + specific_path + '/shaders/'):
+        print('usf', usf)
+    else:
+        print('ERROR ERROR ERROR')
+    with open(top_path + specific_path + '/shaders/' + usf) as f:
         f = f.readlines()
         textures = f[1].split("', '")
         textures[0] = textures[0][4:]
         textures[-1] = textures[-1][:-3]
         # textures = ast.literal_eval(f[1][2:])
 
-    print(material_name)
-    asset = game_path + specific_path + material_name
     matname = unreal.Paths.get_base_filename(asset)
     matpath = game_path + specific_path + matname
     # for asset in unreal.EditorAssetLibrary.list_assets('/Game/'):
@@ -98,6 +104,6 @@ top_path = 'C:/Users/monta/Documents/Unreal Projects/MapsShaderTests/Content/'
 
 game_path = '/Game/'
 # specific_path = '/0A49EB80/'
-specific_path = '0682-1BF1/'
+specific_path = 'HangarAndRest/'
 done_usfs = []
 get_all_materials()

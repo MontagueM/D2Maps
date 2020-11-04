@@ -51,7 +51,7 @@ def get_header(file_hex, header):
     return header
 
 
-def unpack_map(main_file, pkg_name):
+def unpack_map(main_file, pkg_name, shaders):
     d2map = Map(name=main_file)
     gf.mkdir(f'C:/d2_maps/{pkg_name}_fbx/')
 
@@ -64,8 +64,9 @@ def unpack_map(main_file, pkg_name):
     get_model_refs(d2map)
     get_copy_counts(d2map)
 
-    compute_coords(d2map)
-    get_shader_info(d2map)
+    compute_coords(d2map, shaders)
+    if shaders:
+        get_shader_info(d2map)
     write_fbx(d2map)
 
 
@@ -143,7 +144,7 @@ def get_transforms_array(model_refs, copy_counts, rotations, location, map_scale
     return transforms_array
 
 
-def compute_coords(d2map: Map):
+def compute_coords(d2map: Map, shaders):
     nums = 0
     for i, data in enumerate(d2map.copy_counts):
         model_ref = data['UID']
@@ -172,7 +173,7 @@ def compute_coords(d2map: Map):
                         submesh.faces, max_vert_used = met.adjust_faces_data(submesh.faces, max_vert_used)
                         submesh.faces = met.shift_faces_down(submesh.faces)
 
-                        add_model_to_fbx_map(d2map, model_file, submesh, f'{model_ref}_{copy_count}_{j}_{k}')
+                        add_model_to_fbx_map(d2map, model_file, submesh, f'{model_ref}_{copy_count}_{j}_{k}', shaders)
             nums += 1
 
 
@@ -220,13 +221,14 @@ def get_shader_info(d2map: Map):
         met.get_shader_file(material, textures, cbuffer_offsets, all_file_info, custom_dir=f'C:/d2_maps/{d2map.pkg_name}_fbx/shaders/')
 
 
-def add_model_to_fbx_map(d2map: Map, model_file: met.ModelFile, submesh: met.Submesh, name):
+def add_model_to_fbx_map(d2map: Map, model_file: met.ModelFile, submesh: met.Submesh, name, shaders):
     node, mesh = create_mesh(d2map, submesh, name)
     # met.get_submesh_textures(model_file, submesh, custom_dir=f'C:/d2_maps/{d2map.pkg_name}_fbx/textures/')
     if not mesh.GetLayer(0):
         mesh.CreateLayer()
     layer = mesh.GetLayer(0)
-    # apply_shader(d2map, submesh, node)
+    if shaders:
+        apply_shader(d2map, submesh, node)
     # apply_diffuse(d2map, submesh, node)
     create_uv(mesh, name, submesh, layer)
     node.SetShadingMode(fbx.FbxNode.eTextureShading)
@@ -248,7 +250,7 @@ def apply_shader(d2map: Map, submesh: met.Submesh, node):
 
 def create_mesh(d2map: Map, submesh: met.Submesh, name):
     mesh = fbx.FbxMesh.Create(d2map.fbx_model.scene, name)
-    controlpoints = [fbx.FbxVector4(-x[0], x[2], x[1]) for x in submesh.adjusted_pos_verts]
+    controlpoints = [fbx.FbxVector4(-x[0]*100, x[2]*100, x[1]*100) for x in submesh.adjusted_pos_verts]
     for i, p in enumerate(controlpoints):
         mesh.SetControlPointAt(p, i)
     for face in submesh.faces:
@@ -311,7 +313,7 @@ def write_fbx(d2map: Map):
     print(f'Wrote fbx of {d2map.name}')
 
 
-def unpack_folder(pkg_name):
+def unpack_folder(pkg_name, shaders):
     entries_refid = {x: y for x, y in pkg_db.get_entries_from_table(pkg_name, 'FileName, RefID') if y == '0x166D'}
     entries_refpkg = {x: y for x, y in pkg_db.get_entries_from_table(pkg_name, 'FileName, RefPKG') if y == '0x0004'}
     entries_size = {x: y for x, y in pkg_db.get_entries_from_table(pkg_name, 'FileName, FileSizeB')}
@@ -321,10 +323,10 @@ def unpack_folder(pkg_name):
             # a = [x.split('.')[0] for x in os.listdir('C:\d2_maps/orphaned_0932_fbx/')]
             # if file_name in [x.split('.')[0] for x in os.listdir(f'C:\d2_maps/{pkg_name}_fbx/')]:
             #     continue
-            # if '031D' not in file_name:
-            #     continue
+            if '0966' not in file_name:
+                continue
             print(f'Unpacking {file_name}')
-            unpack_map(file_name, pkg_name)
+            unpack_map(file_name, pkg_name, shaders)
 
 
 if __name__ == '__main__':
@@ -333,4 +335,9 @@ if __name__ == '__main__':
     pkg_db.start_db_connection()
     all_file_info = {x[0]: dict(zip(['RefID', 'RefPKG', 'FileType'], x[1:])) for x in
                      pkg_db.get_entries_from_table('Everything', 'FileName, RefID, RefPKG, FileType')}
-    unpack_folder('fleet_039a')
+    unpack_folder('luna_06b0', shaders=True)
+
+"""
+Ideas:
+- load 0369-1C76 + 1705 + 1364 for a lookout from the hangar area in RTX
+"""

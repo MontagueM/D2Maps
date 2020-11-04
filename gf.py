@@ -59,3 +59,31 @@ def mkdir(path):
         os.mkdir(path)
     except FileExistsError:
         pass
+
+
+class File:
+    def __init__(self, name=None, uid=None, pkg_name=None):
+        self.name = name
+        self.uid = uid
+        self.pkg_name = pkg_name
+        self.fhex = None
+
+    def get_file_from_uid(self):
+        self.name = get_file_from_hash(self.uid)
+        return self.pkg_name
+
+    def get_uid_from_file(self):
+        self.uid = get_hash_from_file(self.name)
+        return self.pkg_name
+
+    def get_pkg_name(self):
+        self.pkg_name = get_pkg_name(self.name)
+        return self.pkg_name
+
+    def get_hex_data(self):
+        if not self.pkg_name:
+            self.get_pkg_name()
+        if not self.name:
+            self.get_file_from_uid()
+        self.fhex = get_hex_data(f'C:/d2_output/{self.pkg_name}/{self.name}.bin')
+        return self.fhex

@@ -18,7 +18,7 @@ def get_shader(model_file, submesh, all_file_info, name):
 def get_shader_from_mat(material, textures, cbuffer_offsets, all_file_info, custom_dir):
     # Overwrite
     gf.mkdir(custom_dir)
-    if material.name in os.listdir(custom_dir):
+    if material.name + '_o0.usf' in os.listdir(custom_dir):
         return
     shader = met.File(uid=material.fhex[0x2C8 * 2:0x2C8 * 2 + 8])
     shader.get_file_from_uid()
@@ -184,6 +184,9 @@ def get_instructions(text):
                 uv = line.split(', ')[1].split(')')[0]
                 dot_after = line.split(').')[1]
                 line = f'{equal}= Material_Texture2D_{to_sample[1:]}.SampleLevel(Material_Texture2D_{samplestate-1}Sampler, {uv}, 0).{dot_after}'
+            elif 'LevelOfDetail' in line:
+                equal = line.split('=')[0]
+                line = f'{equal}= 0;'
             instructions.append('  ' + line)
             if 'return;' in line:
                 ret = ''.join(instructions)
@@ -191,6 +194,7 @@ def get_instructions(text):
                 ret = ret.replace('cmp', '')
                 # discard doesnt work in ue4 hlsl
                 ret = ret.replace('discard', '{ o0.w = 0; }')
+                # just in case theres some stupid other texture calls
                 return ret
         elif 'void main(' in line:
             care = True
