@@ -4,7 +4,7 @@ import unreal
 
 
 def get_all_materials():
-    for asset in unreal.EditorAssetLibrary.list_assets(game_path + specific_path):
+    for asset in unreal.EditorAssetLibrary.list_assets(game_path + material_path):
         asset_data = unreal.EditorAssetLibrary.find_asset_data(asset)
         if asset_data.asset_class == "Material":
             modify_material(asset)
@@ -19,11 +19,11 @@ def get_all_materials():
 
 def modify_material(asset):
     usf = asset.split('.')[-1].split('_')[0] + '_o0.usf'
-    if usf in os.listdir(top_path + specific_path + '/shaders/'):
+    if usf in os.listdir(top_path + shader_path + '/shaders/'):
         print('usf', usf)
     else:
         print('ERROR ERROR ERROR')
-    with open(top_path + specific_path + '/shaders/' + usf) as f:
+    with open(top_path + shader_path + '/shaders/' + usf) as f:
         f = f.readlines()
         textures = f[1].split("', '")
         textures[0] = textures[0][4:]
@@ -31,7 +31,7 @@ def modify_material(asset):
         # textures = ast.literal_eval(f[1][2:])
 
     matname = unreal.Paths.get_base_filename(asset)
-    matpath = game_path + specific_path + matname
+    matpath = game_path + material_path + matname
     # for asset in unreal.EditorAssetLibrary.list_assets('/Game/'):
     asset_data = unreal.EditorAssetLibrary.find_asset_data(matpath)
     if asset_data.asset_class == "Material":
@@ -63,13 +63,14 @@ def connect_nodes(mat, texsamples, custexprs):
     # unreal.MaterialEditingLibrary.connect_material_property(, '', unreal.MaterialProperty.MP_EMISSIVE_COLOR)
     # unreal.MaterialEditingLibrary.connect_material_property(, '', unreal.MaterialProperty.MP_ROUGHNESS)
 
+
 def add_cust_exprs(material, usf, textures):
     custexprs = []
-    for i in range(1):
+    for i in range(3):
         custexpr = unreal.MaterialEditingLibrary.create_material_expression(material,
                                                                             unreal.MaterialExpressionCustom,
                                                                             -300, 300*i)
-        code = '#include "' + top_path + specific_path + '/shaders/' + usf[:-7] + '_o' + str(i) + '.usf"\nreturn 0;'
+        code = '#include "' + top_path + shader_path + '/shaders/' + usf[:-7] + '_o' + str(i) + '.usf"\nreturn 0;'
         inputs = []
         for i in range(len(textures)):
             ci = unreal.CustomInput()
@@ -92,11 +93,33 @@ def add_tex_samples(material, textures):
                                                                              unreal.MaterialExpressionTextureSample,
                                                                              -600, 300 * i)
         ts_TextureName = unreal.Paths.get_base_filename(tex + '.png')
-        ts_TextureUePath = game_path + specific_path + '/Textures/' + ts_TextureName
+        ts_TextureUePath = game_path + texture_path + '/Textures/' + ts_TextureName
         ts_LoadedTexture = unreal.EditorAssetLibrary.load_asset(ts_TextureUePath)
         texsample.set_editor_property('texture', ts_LoadedTexture)
         texsamples.append(texsample)
     return texsamples
+
+
+# def add_normal_roughness_nodes(material):
+#     breakout4 = unreal.MaterialEditingLibrary.create_material_expression(material,
+#                                                                          unreal.MaterialExpressionTextureSample,
+#                                                                          -1000, 300)
+#     normal = unreal.MaterialEditingLibrary.create_material_expression(material,
+#                                                                          unreal.MaterialExpressionTextureSample,
+#                                                                          -1000, 300)
+#
+#
+# def add_roughness_nodes():
+#     pass
+
+
+def add_emissive_colour_nodes():
+    pass
+
+
+# def add_ambient_occlusion_nodes():
+#     pass
+
 
 # add_tex_samples()
 top_path = 'C:/Users/monta/Documents/Unreal Projects/MapsShaderTests/Content/'
@@ -104,6 +127,8 @@ top_path = 'C:/Users/monta/Documents/Unreal Projects/MapsShaderTests/Content/'
 
 game_path = '/Game/'
 # specific_path = '/0A49EB80/'
-specific_path = 'HangarAndRest/'
+material_path = 'test/'
+texture_path = 'HangarAndRest/'
+shader_path = 'HangarAndRest/'
 done_usfs = []
 get_all_materials()
