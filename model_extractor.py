@@ -51,7 +51,7 @@ class File:
             self.get_pkg_name()
         if not self.name:
             self.get_file_from_uid()
-        self.fhex = gf.get_hex_data(f'C:/d2_output/{self.pkg_name}/{self.name}.bin')
+        self.fhex = gf.get_hex_data(f'I:/d2_output_3_0_0_1/{self.pkg_name}/{self.name}.bin')
         return self.fhex
 
 
@@ -70,7 +70,7 @@ class ModelFile(File):
         pkg_name = self.get_pkg_name()
         if not pkg_name:
             raise RuntimeError('Invalid model file given')
-        self.model_file_hex = gf.get_hex_data(f'C:/d2_output/{pkg_name}/{self.name}.bin')
+        self.model_file_hex = gf.get_hex_data(f'I:/d2_output_3_0_0_1/{pkg_name}/{self.name}.bin')
         model_data_hash = self.model_file_hex[16:24]
         return gf.get_file_from_hash(model_data_hash)
 
@@ -114,7 +114,7 @@ class HeaderFile(File):
             if not self.name:
                 self.name = gf.get_file_from_hash(self.uid)
             pkg_name = gf.get_pkg_name(self.name)
-            header_hex = gf.get_hex_data(f'C:/d2_output/{pkg_name}/{self.name}.bin')
+            header_hex = gf.get_hex_data(f'I:/d2_output_3_0_0_1/{pkg_name}/{self.name}.bin')
             return get_header(header_hex, Stride12Header())
 
 
@@ -165,15 +165,15 @@ def get_model_data(model_file: ModelFile, all_file_info):
             coords = get_verts_data(model.extra_verts_file, all_file_info, is_uv=True)
             model.uv_verts = coords[0]
             model.norm_verts = coords[1]
-            model.uv_verts = scale_and_repos_uv_verts(model.uv_verts, model_file)
+            # model.uv_verts = scale_and_repos_uv_verts(model.uv_verts, model_file)
         model.faces = get_faces_data(model.faces_file, all_file_info)
     return True
 
 
 def get_model_files(model_file: ModelFile):
     model_file.model_data_file.get_pkg_name()
-    model_file.model_data_hex = gf.get_hex_data(f'C:/d2_output/{model_file.model_data_file.pkg_name}/{model_file.model_data_file.name}.bin')
-    split_hex = model_file.model_data_hex.split('BD9F8080')[-1]
+    model_file.model_data_hex = gf.get_hex_data(f'I:/d2_output_3_0_0_1/{model_file.model_data_file.pkg_name}/{model_file.model_data_file.name}.bin')
+    split_hex = model_file.model_data_hex.split('B89F8080')[-1]
     model_count = int(gf.get_flipped_hex(split_hex[:4], 4), 16)
     relevant_hex = split_hex[32:]
 
@@ -184,6 +184,9 @@ def get_model_files(model_file: ModelFile):
         pos_verts_file = gf.get_flipped_hex(relevant_hex[32*i+8:32*i+16], 8)
         uv_verts_file = gf.get_flipped_hex(relevant_hex[32*i+16:32*i+24], 8)
         if pos_verts_file == '' or faces_hash == '':
+            return
+        # This is due to a new type of model/dynamics being added, ignoring for now
+        if faces_hash == '00000000' or pos_verts_file == '00000000':
             return
         for j, hsh in enumerate([faces_hash, pos_verts_file, uv_verts_file]):
             hf = HeaderFile()
@@ -207,11 +210,11 @@ def get_model_files(model_file: ModelFile):
 
 
 def get_submeshes(model_file: ModelFile):
-    unk_entries_count = int(gf.get_flipped_hex(model_file.model_data_hex[80*2:80*2 + 8], 4), 16)
-    unk_entries_offset = 96
+    unk_entries_count = int(gf.get_flipped_hex(model_file.model_data_hex[128*2:128*2 + 8], 4), 16)
+    unk_entries_offset = 144
 
-    end_offset = unk_entries_offset + unk_entries_count * 8
-    end_place = int(model_file.model_data_hex[end_offset*2:].find('BD9F8080')/2)
+    end_offset = unk_entries_offset + unk_entries_count * 6
+    end_place = int(model_file.model_data_hex[end_offset*2:].find('B89F8080')/2)
     submesh_entries_count = int(gf.get_flipped_hex(model_file.model_data_hex[(end_offset + end_place + 4)*2:(end_offset + end_place + 6)*2], 4), 16)
     submesh_entries_offset = end_offset + end_place + 20
     submesh_entries_length = submesh_entries_count * 12
@@ -240,13 +243,13 @@ def get_submeshes(model_file: ModelFile):
 
 
 def get_materials(model_file: ModelFile):
-    texture_count = int(gf.get_flipped_hex(model_file.model_data_hex[80*2:84*2], 8), 16)
-    texture_id_entries = [[int(gf.get_flipped_hex(model_file.model_data_hex[i:i+4], 4), 16), model_file.model_data_hex[i+4:i+8], model_file.model_data_hex[i+8:i+12]] for i in range(96*2, 96*2+texture_count*16, 16)]
-    texture_entries = [model_file.model_file_hex[i:i+8] for i in range(176*2, 176*2+texture_count*8, 8)]
+    texture_count = int(gf.get_flipped_hex(model_file.model_data_hex[128*2:128*2+8], 8), 16)
+    texture_id_entries = [[int(gf.get_flipped_hex(model_file.model_data_hex[i:i+4], 4), 16), model_file.model_data_hex[i+4:i+6], model_file.model_data_hex[i+8:i+12]] for i in range(144*2, 144*2+texture_count*12, 12)]
+    texture_entries = [model_file.model_file_hex[i:i+8] for i in range(144*2, 144*2+texture_count*8, 8)]
     relevant_textures = {}
     for i, entry in enumerate(texture_id_entries):
         # 0000 is LOD0, 0003 is prob LOD1, 000C LOD2
-        if entry[1] == '0000':
+        if entry[1] == '00':
             relevant_textures[entry[0]] = gf.get_file_from_hash(texture_entries[i])
     return relevant_textures
 
@@ -281,12 +284,12 @@ def adjust_faces_data(faces_data, max_vert_used):
 
 
 def scale_and_repos_pos_verts(verts_data, model_file):
-    scale = struct.unpack('f', bytes.fromhex(model_file.model_file_hex[0x6C*2:0x6C*2 + 8]))[0]
+    scale = struct.unpack('f', bytes.fromhex(model_file.model_data_hex[184:184 + 8]))[0]
     for i in range(len(verts_data)):
         for j in range(3):
             verts_data[i][j] *= scale
 
-    position_shift = [struct.unpack('f', bytes.fromhex(model_file.model_file_hex[192 + 8 * i:192 + 8 * (i + 1)]))[0] for i in range(3)]
+    position_shift = [struct.unpack('f', bytes.fromhex(model_file.model_data_hex[160 + 8 * i:160 + 8 * (i + 1)]))[0] for i in range(3)]
     for i in range(3):
         for j in range(len(verts_data)):
             verts_data[j][i] -= (scale - position_shift[i])
@@ -319,7 +322,7 @@ def get_faces_data(faces_file, all_file_info):
     ref_file_type = all_file_info[ref_file]['FileType']
     faces = []
     if ref_file_type == "Faces Header":
-        faces_hex = gf.get_hex_data(f'C:/d2_output/{ref_pkg_name}/{ref_file}.bin')
+        faces_hex = gf.get_hex_data(f'I:/d2_output_3_0_0_1/{ref_pkg_name}/{ref_file}.bin')
         int_faces_data = [int(gf.get_flipped_hex(faces_hex[i:i+4], 4), 16)+1 for i in range(0, len(faces_hex), 4)]
         for i in range(0, len(int_faces_data), 3):
             face = []
@@ -359,7 +362,7 @@ def get_verts_data(verts_file, all_file_info, is_uv):
     if ref_file_type == "Stride Header":
         stride_header = verts_file.header
 
-        stride_hex = gf.get_hex_data(f'C:/d2_output/{ref_pkg_name}/{ref_file}.bin')
+        stride_hex = gf.get_hex_data(f'I:/d2_output_3_0_0_1/{ref_pkg_name}/{ref_file}.bin')
 
         hex_data_split = [stride_hex[i:i + stride_header.StrideLength * 2] for i in
                           range(0, len(stride_hex), stride_header.StrideLength * 2)]
@@ -391,7 +394,7 @@ def get_verts_data(verts_file, all_file_info, is_uv):
         """
         UV
         """
-        coords = get_coords_16(hex_data_split)
+        coords = get_coords_16(hex_data_split, is_uv)
     elif stride_header.StrideLength == 20:
         """
         UV info for static and dynamic, non-physics objects.
@@ -482,15 +485,26 @@ def get_coords_12(hex_data_split, is_uv):
         return coords
 
 
-def get_coords_16(hex_data_split):
+def get_coords_16(hex_data_split, is_uv):
+    uvs = []
     coords = []
     for hex_data in hex_data_split:
-        coord = []
-        for j in range(2):
-            flt = get_float16(hex_data, j)
-            coord.append(flt)
-        coords.append(coord)
-    return [coords, []]
+        if is_uv:
+            uv = []
+            for j in range(2):
+                flt = get_float16(hex_data, j)
+                uv.append(flt)
+            uvs.append(uv)
+        else:
+            coord = []
+            for j in range(3):
+                flt = get_float16(hex_data, j)
+                coord.append(flt)
+            coords.append(coord)
+    if is_uv:
+        return [uvs, []]
+    else:
+        return coords
 
 
 def get_coords_20(hex_data_split):
@@ -541,11 +555,12 @@ def trim_verts_data(verts_data, faces_data):
 
 
 def export_fbx(model_file: ModelFile, submesh: Submesh, name):
-    gf.mkdir(f'C:/d2_model_temp/texture_models/{model_file.uid}/')
+    gf.mkdir(f'I:/static_models/{model_file.uid}/')
 
     model = pfb.Model()
     node, mesh = create_mesh(model, submesh.pos_verts, submesh.faces, name)
-    if submesh.material:
+    # Disabled materials for now
+    if submesh.material and False:
         # get_submesh_textures(model_file, submesh)
         # shaders.get_shader(model_file, submesh, all_file_info, name)
         apply_shader(model, model_file, submesh, node)
@@ -562,9 +577,11 @@ def export_fbx(model_file: ModelFile, submesh: Submesh, name):
             node.SetShadingMode(fbx.FbxNode.eTextureShading)
     model.scene.GetRootNode().AddChild(node)
 
-    get_shader_info(model_file)
+    # Disabled shaders for now
+    if False:
+        get_shader_info(model_file)
 
-    model.export(save_path=f'C:/d2_model_temp/texture_models/{model_file.uid}/{name}.fbx', ascii_format=False)
+    model.export(save_path=f'I:/static_models/{model_file.uid}/{name}.fbx', ascii_format=False)
     print('Exported')
 
 
@@ -610,11 +627,11 @@ def get_submesh_textures(model_file: ModelFile, submesh: Submesh, custom_dir=Fal
             if not os.path.exists(f'{custom_dir}/{img}.png'):
                 if img == 'FBFF-1FFF':
                     continue
-                imager.get_image_from_file(f'C:/d2_output/{gf.get_pkg_name(img)}/{img}.bin', f'{custom_dir}/')
+                imager.get_image_from_file(f'I:/d2_output_3_0_0_1/{gf.get_pkg_name(img)}/{img}.bin', f'{custom_dir}/')
         else:
             gf.mkdir(f'C:/d2_model_temp/texture_models/{model_file.uid}/textures/')
             if not os.path.exists(f'C:/d2_model_temp/texture_models/{model_file.uid}/textures/{img}.png'):
-                imager.get_image_from_file(f'C:/d2_output/{gf.get_pkg_name(img)}/{img}.bin', f'C:/d2_model_temp/texture_models/{model_file.uid}/textures/')
+                imager.get_image_from_file(f'I:/d2_output_3_0_0_1/{gf.get_pkg_name(img)}/{img}.bin', f'C:/d2_model_temp/texture_models/{model_file.uid}/textures/')
 
 
 def get_mat_tables(material):
@@ -663,11 +680,11 @@ def get_material_textures(material, texture_offset, custom_dir):
             if not os.path.exists(f'{custom_dir}/{img}.png'):
                 if img == 'FBFF-1FFF':
                     continue
-                imager.get_image_from_file(f'C:/d2_output/{gf.get_pkg_name(img)}/{img}.bin', f'{custom_dir}/')
+                imager.get_image_from_file(f'I:/d2_output_3_0_0_1/{gf.get_pkg_name(img)}/{img}.bin', f'{custom_dir}/')
         # else:
         #     gf.mkdir(f'C:/d2_model_temp/texture_models/{model_file.uid}/textures/')
         #     if not os.path.exists(f'C:/d2_model_temp/texture_models/{model_file.uid}/textures/{img}.png'):
-        #         imager.get_image_from_file(f'C:/d2_output/{gf.get_pkg_name(img)}/{img}.bin', f'C:/d2_model_temp/texture_models/{model_file.uid}/textures/')
+        #         imager.get_image_from_file(f'I:/d2_output_3_0_0_1/{gf.get_pkg_name(img)}/{img}.bin', f'C:/d2_model_temp/texture_models/{model_file.uid}/textures/')
     return images
 
 
@@ -744,4 +761,4 @@ if __name__ == '__main__':
     all_file_info = {x[0]: dict(zip(['RefID', 'RefPKG', 'FileType'], x[1:])) for x in
                      pkg_db.get_entries_from_table('Everything', 'FileName, RefID, RefPKG, FileType')}
 
-    get_model('E12ED80')
+    get_model('3348D580')
