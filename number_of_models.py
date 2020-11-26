@@ -3,7 +3,7 @@ import gf
 
 def number_of_models(pkg_name):
     pkg_db.start_db_connection()
-    entries_refid = {x: y for x, y in pkg_db.get_entries_from_table(pkg_name, 'FileName, RefID') if y == '0x166D'}
+    entries_refid = {x: y for x, y in pkg_db.get_entries_from_table(pkg_name, 'FileName, RefID') if y == '0x13AD'}
     entries_refpkg = {x: y for x, y in pkg_db.get_entries_from_table(pkg_name, 'FileName, RefPKG') if y == '0x0004'}
     entries_size = {x: y for x, y in pkg_db.get_entries_from_table(pkg_name, 'FileName, FileSizeB')}
     file_names = sorted(entries_refid.keys(), key=lambda x: entries_size[x])
@@ -17,4 +17,4 @@ def number_of_models(pkg_name):
 
 
 if __name__ == '__main__':
-    number_of_models('city_tower_d2_0369')
+    number_of_models('city_tower_d2_02aa')

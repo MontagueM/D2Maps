@@ -15,19 +15,42 @@ has the actual image data which uses the header data to transcribe that data to 
 
 
 @dataclass
-class ImageHeader:
+class OldImageHeader:
     EntrySize: np.uint32 = np.uint32(0)  # 0
     TextureFormat: np.uint32 = np.uint32(0)  # 4
-    Field8: np.uint32 = np.uint32(0)
-    Cafe: np.uint16 = np.uint16(0)  # 0xCAFE
+    Field8: np.uint32 = np.uint32(0)  # 8
+    Cafe: np.uint16 = np.uint16(0)  # C  0xCAFE
     Width: np.uint16 = np.uint16(0)  # E
     Height: np.uint16 = np.uint16(0)  # 10
-    Field12: np.uint16 = np.uint16(0)
-    Field14: np.uint32 = np.uint32(0)
-    Field18: np.uint32 = np.uint32(0)
-    Field1C: np.uint32 = np.uint32(0)
-    Field20: np.uint32 = np.uint32(0)
+    Field12: np.uint16 = np.uint16(0)  # 12
+    Field14: np.uint32 = np.uint32(0)  # 14
+    Field18: np.uint32 = np.uint32(0)  # 18
+    Field1C: np.uint32 = np.uint32(0)  # 1C
+    Field20: np.uint32 = np.uint32(0)  # 20
     LargeTextureHash: np.uint32 = np.uint32(0)  # 24
+    TextureFormatDefined: str = ''
+
+
+@dataclass
+class ImageHeader:
+    Field0: np.uint32 = np.uint32(0)  # 0
+    TextureFormat: np.uint32 = np.uint32(0)  # 4
+    Field8: np.uint32 = np.uint32(0)  # 8
+    FieldC:  np.uint32 = np.uint32(0)  # C
+    Field10: np.uint32 = np.uint32(0)  # 10
+    Field14: np.uint32 = np.uint32(0)  # 14
+    Field18: np.uint32 = np.uint32(0)  # 18
+    Field1C: np.uint32 = np.uint32(0)  # 1C
+    Cafe: np.uint16 = np.uint16(0)  # 20  0xCAFE
+    Width: np.uint16 = np.uint16(0)  # 22
+    Height: np.uint16 = np.uint16(0)  # 24
+    Field26: np.uint16 = np.uint16(0)
+    Field28: np.uint32 = np.uint32(0)
+    Field2C: np.uint32 = np.uint32(0)
+    Field30: np.uint32 = np.uint32(0)
+    Field34: np.uint32 = np.uint32(0)
+    Field38: np.uint32 = np.uint32(0)
+    LargeTextureHash: np.uint32 = np.uint32(0)  # 3C
     TextureFormatDefined: str = ''
 
 # This header includes the magic number, DDS header, and DXT10 DDS header
@@ -241,7 +264,7 @@ def get_image_from_file(file_path, save_path=None):
     ref_pkg = gf.get_pkg_name(ref_file_name)
     if this_entry[-1] == 'Texture Header':
         header_hex = gf.get_hex_data(file_path)
-        data_hex = gf.get_hex_data(f'C:/d2_output/{ref_pkg}/{ref_file_name}.bin')
+        data_hex = gf.get_hex_data(f'I:/d2_output_3_0_0_2/{ref_pkg}/{ref_file_name}.bin')
     elif this_entry[-1] == 'Texture Data':
         print('Only pass through header please, cba to fix this.')
         return
@@ -256,14 +279,14 @@ def get_image_from_file(file_path, save_path=None):
     if large_tex_hash != 'FFFFFFFF':
         large_file = gf.get_file_from_hash(large_tex_hash)
         pkg_name = gf.get_pkg_name(large_file)
-        data_hex = gf.get_hex_data(f'C:/d2_output/{pkg_name}/{large_file}.bin')
+        data_hex = gf.get_hex_data(f'I:/d2_output_3_0_0_2/{pkg_name}/{large_file}.bin')
     print(ref_file_name)
     img = get_image_from_data(header, dimensions, data_hex)
     if img:
         if save_path:
             img.save(f'{save_path}/{file_name}.png')
         else:
-            img.save(f'C:/d2_output_2_9_2_0_images/{file_pkg}/{file_name}.png')
+            img.save(f'I:/d2_output_3_0_0_2_images/{file_pkg}/{file_name}.png')
             img.show()
 
 

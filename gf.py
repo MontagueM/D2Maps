@@ -44,13 +44,20 @@ def get_pkg_name(file):
         print(f'{file} is invalid.')
         return None
     pkg_id = file.split('-')[0]
-    for folder in os.listdir('I:/d2_output_3_0_0_1/'):
+    for folder in os.listdir('I:/d2_output_3_0_0_4/'):
         if pkg_id.lower() in folder.lower():
             pkg_name = folder
             break
     else:
-        print(f'Could not find folder for {file}. File is likely not a model or folder does not exist.')
-        return None
+        if pkg_id == '0100':
+            pkg_name = 'ui_startup_unp1'
+        elif pkg_id == '0101':
+            pkg_name = 'ui_bootflow_unp1'
+        elif pkg_id == '0102':
+            pkg_name = 'client_bootstrap_unp1'
+        else:
+            print(f'Could not find folder for {file}. File is likely not a model or folder does not exist.')
+            return None
     return pkg_name
 
 
@@ -85,5 +92,5 @@ class File:
             self.get_pkg_name()
         if not self.name:
             self.get_file_from_uid()
-        self.fhex = get_hex_data(f'I:/d2_output_3_0_0_1/{self.pkg_name}/{self.name}.bin')
+        self.fhex = get_hex_data(f'I:/d2_output_3_0_0_4/{self.pkg_name}/{self.name}.bin')
         return self.fhex

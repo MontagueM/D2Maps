@@ -51,7 +51,7 @@ class File:
             self.get_pkg_name()
         if not self.name:
             self.get_file_from_uid()
-        self.fhex = gf.get_hex_data(f'I:/d2_output_3_0_0_1/{self.pkg_name}/{self.name}.bin')
+        self.fhex = gf.get_hex_data(f'I:/d2_output_3_0_0_4/{self.pkg_name}/{self.name}.bin')
         return self.fhex
 
 
@@ -69,8 +69,9 @@ class ModelFile(File):
         self.get_file_from_uid()
         pkg_name = self.get_pkg_name()
         if not pkg_name:
-            raise RuntimeError('Invalid model file given')
-        self.model_file_hex = gf.get_hex_data(f'I:/d2_output_3_0_0_1/{pkg_name}/{self.name}.bin')
+            return None
+            # raise RuntimeError('Invalid model file given')
+        self.model_file_hex = gf.get_hex_data(f'I:/d2_output_3_0_0_4/{pkg_name}/{self.name}.bin')
         model_data_hash = self.model_file_hex[16:24]
         return gf.get_file_from_hash(model_data_hash)
 
@@ -114,8 +115,9 @@ class HeaderFile(File):
             if not self.name:
                 self.name = gf.get_file_from_hash(self.uid)
             pkg_name = gf.get_pkg_name(self.name)
-            header_hex = gf.get_hex_data(f'I:/d2_output_3_0_0_1/{pkg_name}/{self.name}.bin')
-            return get_header(header_hex, Stride12Header())
+            header_hex = gf.get_hex_data(f'I:/d2_output_3_0_0_4/{pkg_name}/{self.name}.bin')
+            self.header = get_header(header_hex, Stride12Header())
+            return self.header
 
 
 def get_header(file_hex, header):
@@ -171,8 +173,12 @@ def get_model_data(model_file: ModelFile, all_file_info):
 
 
 def get_model_files(model_file: ModelFile):
+    # Also due to new type
+    if not model_file.model_data_file.name or model_file.model_data_file.name == '0400-0008':
+        print('NEW TYPEa')
+        return
     model_file.model_data_file.get_pkg_name()
-    model_file.model_data_hex = gf.get_hex_data(f'I:/d2_output_3_0_0_1/{model_file.model_data_file.pkg_name}/{model_file.model_data_file.name}.bin')
+    model_file.model_data_hex = gf.get_hex_data(f'I:/d2_output_3_0_0_4/{model_file.model_data_file.pkg_name}/{model_file.model_data_file.name}.bin')
     split_hex = model_file.model_data_hex.split('B89F8080')[-1]
     model_count = int(gf.get_flipped_hex(split_hex[:4], 4), 16)
     relevant_hex = split_hex[32:]
@@ -187,6 +193,7 @@ def get_model_files(model_file: ModelFile):
             return
         # This is due to a new type of model/dynamics being added, ignoring for now
         if faces_hash == '00000000' or pos_verts_file == '00000000':
+            print('NEW TYPEb')
             return
         for j, hsh in enumerate([faces_hash, pos_verts_file, uv_verts_file]):
             hf = HeaderFile()
@@ -322,7 +329,7 @@ def get_faces_data(faces_file, all_file_info):
     ref_file_type = all_file_info[ref_file]['FileType']
     faces = []
     if ref_file_type == "Faces Header":
-        faces_hex = gf.get_hex_data(f'I:/d2_output_3_0_0_1/{ref_pkg_name}/{ref_file}.bin')
+        faces_hex = gf.get_hex_data(f'I:/d2_output_3_0_0_4/{ref_pkg_name}/{ref_file}.bin')
         int_faces_data = [int(gf.get_flipped_hex(faces_hex[i:i+4], 4), 16)+1 for i in range(0, len(faces_hex), 4)]
         for i in range(0, len(int_faces_data), 3):
             face = []
@@ -362,7 +369,7 @@ def get_verts_data(verts_file, all_file_info, is_uv):
     if ref_file_type == "Stride Header":
         stride_header = verts_file.header
 
-        stride_hex = gf.get_hex_data(f'I:/d2_output_3_0_0_1/{ref_pkg_name}/{ref_file}.bin')
+        stride_hex = gf.get_hex_data(f'I:/d2_output_3_0_0_4/{ref_pkg_name}/{ref_file}.bin')
 
         hex_data_split = [stride_hex[i:i + stride_header.StrideLength * 2] for i in
                           range(0, len(stride_hex), stride_header.StrideLength * 2)]
@@ -627,11 +634,11 @@ def get_submesh_textures(model_file: ModelFile, submesh: Submesh, custom_dir=Fal
             if not os.path.exists(f'{custom_dir}/{img}.png'):
                 if img == 'FBFF-1FFF':
                     continue
-                imager.get_image_from_file(f'I:/d2_output_3_0_0_1/{gf.get_pkg_name(img)}/{img}.bin', f'{custom_dir}/')
+                imager.get_image_from_file(f'I:/d2_output_3_0_0_4/{gf.get_pkg_name(img)}/{img}.bin', f'{custom_dir}/')
         else:
             gf.mkdir(f'C:/d2_model_temp/texture_models/{model_file.uid}/textures/')
             if not os.path.exists(f'C:/d2_model_temp/texture_models/{model_file.uid}/textures/{img}.png'):
-                imager.get_image_from_file(f'I:/d2_output_3_0_0_1/{gf.get_pkg_name(img)}/{img}.bin', f'C:/d2_model_temp/texture_models/{model_file.uid}/textures/')
+                imager.get_image_from_file(f'I:/d2_output_3_0_0_4/{gf.get_pkg_name(img)}/{img}.bin', f'C:/d2_model_temp/texture_models/{model_file.uid}/textures/')
 
 
 def get_mat_tables(material):
@@ -680,11 +687,11 @@ def get_material_textures(material, texture_offset, custom_dir):
             if not os.path.exists(f'{custom_dir}/{img}.png'):
                 if img == 'FBFF-1FFF':
                     continue
-                imager.get_image_from_file(f'I:/d2_output_3_0_0_1/{gf.get_pkg_name(img)}/{img}.bin', f'{custom_dir}/')
+                imager.get_image_from_file(f'I:/d2_output_3_0_0_4/{gf.get_pkg_name(img)}/{img}.bin', f'{custom_dir}/')
         # else:
         #     gf.mkdir(f'C:/d2_model_temp/texture_models/{model_file.uid}/textures/')
         #     if not os.path.exists(f'C:/d2_model_temp/texture_models/{model_file.uid}/textures/{img}.png'):
-        #         imager.get_image_from_file(f'I:/d2_output_3_0_0_1/{gf.get_pkg_name(img)}/{img}.bin', f'C:/d2_model_temp/texture_models/{model_file.uid}/textures/')
+        #         imager.get_image_from_file(f'I:/d2_output_3_0_0_2/{gf.get_pkg_name(img)}/{img}.bin', f'C:/d2_model_temp/texture_models/{model_file.uid}/textures/')
     return images
 
 

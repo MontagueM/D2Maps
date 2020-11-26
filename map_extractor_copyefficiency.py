@@ -7,6 +7,8 @@ import pkg_db
 import fbx
 import pyfbx as pfb
 import gf
+import quaternion
+import math
 
 
 @dataclass
@@ -166,19 +168,47 @@ def compute_coords(d2map: Map, shaders):
 
         """Could make more efficient by just duping models instead of remaking them here."""
         max_vert_used = 0
-        for copy_count in range(copy_count):
-            for j, model in enumerate(model_file.models):
-                for k, submesh in enumerate(model.submeshes):
-                    if submesh.type == 769 or submesh.type == 770 or submesh.type == 778:
-                        rotate_verts(submesh, d2map.rotations[nums])
-                        a = d2map.scales[nums]
-                        print(f'{model_ref}_{copy_count}_{j}_{k}', d2map.rotations[nums])
-                        get_map_scaled_verts(submesh, d2map.scales[nums])
-                        get_map_moved_verts(submesh, d2map.locations[nums], d2map.scales[nums])
-                        submesh.faces, max_vert_used = met.adjust_faces_data(submesh.faces, max_vert_used)
-                        submesh.faces = met.shift_faces_down(submesh.faces)
-                        add_model_to_fbx_map(d2map, model_file, submesh, f'{model_ref}_{copy_count}_{j}_{k}', shaders)
-            nums += 1
+        for j, model in enumerate(model_file.models):
+            for k, submesh in enumerate(model.submeshes):
+                if submesh.type == 769 or submesh.type == 770 or submesh.type == 778:
+                    for cc in range(copy_count):
+                        name = f'{model_ref}_{cc}_{j}_{k}'
+                        # print(name)
+                        if cc == 0:
+                            submesh.faces, max_vert_used = met.adjust_faces_data(submesh.faces, max_vert_used)
+                            submesh.faces = met.shift_faces_down(submesh.faces)
+                            mesh = create_mesh(d2map, submesh, name)
+                        node = fbx.FbxNode.Create(d2map.fbx_model.scene, name)
+
+
+                        rot = d2map.rotations[nums+cc]
+
+                        # This seems to remove the gimbal error but idc
+                        # f = rot[-1]
+                        # if f > 0:  # getting -0.0:
+                        #     rot = [-x for x in rot]
+
+                        # print(name, rot)
+                        node.SetNodeAttribute(mesh)
+                        # Rotating for niceness
+                        # loc_rot = rotate_verts(d2map.locations[nums+cc], [0.7071068, 0, 0, 0.7071068], inverse=False)
+                        loc_rot = d2map.locations[nums+cc]
+                        r = scipy.spatial.transform.Rotation.from_quat(rot).as_euler('xyz', degrees=True)
+                        # i = fbx.FbxVector4(q[0], q[1], q[2])
+                        # Luckily order does not matter here as the rotation is always local not about origin + Converting to Eulerian
+                        node.SetGeometricRotation(fbx.FbxNode.eSourcePivot, fbx.FbxVector4(-r[0]-90, r[1]-180, r[2]))
+                        node.SetGeometricTranslation(fbx.FbxNode.eSourcePivot, fbx.FbxVector4(loc_rot[0], loc_rot[1], loc_rot[2]))
+                        node.SetGeometricScaling(fbx.FbxNode.eSourcePivot, fbx.FbxVector4(d2map.scales[nums+cc], d2map.scales[nums+cc], d2map.scales[nums+cc]))
+                        d2map.fbx_model.scene.GetRootNode().AddChild(node)
+                        # rotate_verts(submesh, d2map.rotations[nums])
+                        # a = d2map.scales[nums]
+                        # get_map_scaled_verts(submesh, d2map.scales[nums])
+                        # get_map_moved_verts(submesh, d2map.locations[nums], d2map.scales[nums])
+                        # submesh.faces, max_vert_used = met.adjust_faces_data(submesh.faces, max_vert_used)
+                        # submesh.faces = met.shift_faces_down(submesh.faces)
+                        # add_model_to_fbx_map(d2map, model_file, submesh, f'{model_ref}_{copy_count}_{j}_{k}', shaders)
+                        # return
+        nums += copy_count
         # return
 
 def get_map_scaled_verts(submesh: met.Submesh, map_scaler):
@@ -194,13 +224,13 @@ def get_map_moved_verts(submesh: met.Submesh, location, scale):
             # submesh.adjusted_pos_verts[i][j] *= 100
 
 
-def rotate_verts(submesh: met.Submesh, rotations, inverse=False):
-    r = scipy.spatial.transform.Rotation.from_quat(rotations)
-    if len(submesh.pos_verts) == 3:
-        quat_rots = scipy.spatial.transform.Rotation.apply(r, submesh.pos_verts, inverse=inverse)
+def rotate_verts(verts, rotation, inverse=False):
+    r = scipy.spatial.transform.Rotation.from_quat(rotation)
+    if len(verts) == 3:
+        quat_rots = scipy.spatial.transform.Rotation.apply(r, verts, inverse=inverse)
     else:
-        quat_rots = scipy.spatial.transform.Rotation.apply(r, [[x[0], x[1], x[2]] for x in submesh.pos_verts], inverse=inverse)
-    submesh.adjusted_pos_verts = quat_rots.tolist()
+        quat_rots = scipy.spatial.transform.Rotation.apply(r, [[x[0], x[1], x[2]] for x in verts], inverse=inverse)
+    return quat_rots.tolist()
 
 
 def shift_faces_down(faces_data):
@@ -253,7 +283,7 @@ def apply_shader(d2map: Map, submesh: met.Submesh, node):
 
 def create_mesh(d2map: Map, submesh: met.Submesh, name):
     mesh = fbx.FbxMesh.Create(d2map.fbx_model.scene, name)
-    controlpoints = [fbx.FbxVector4(x[0]*100, x[1]*100, x[2]*100) for x in submesh.adjusted_pos_verts]
+    controlpoints = [fbx.FbxVector4(-x[0], x[2], x[1]) for x in submesh.pos_verts]
     for i, p in enumerate(controlpoints):
         mesh.SetControlPointAt(p, i)
     for face in submesh.faces:
@@ -263,10 +293,10 @@ def create_mesh(d2map: Map, submesh: met.Submesh, name):
         mesh.AddPolygon(face[2]-1)
         mesh.EndPolygon()
 
-    node = fbx.FbxNode.Create(d2map.fbx_model.scene, name)
-    node.SetNodeAttribute(mesh)
+    # node = fbx.FbxNode.Create(d2map.fbx_model.scene, name)
+    # node.SetNodeAttribute(mesh)
 
-    return node, mesh
+    return mesh
 
 
 def apply_diffuse(d2map, submesh, node):
@@ -312,7 +342,7 @@ def create_uv(mesh, name, submesh: met.Submesh, layer):
 
 
 def write_fbx(d2map: Map):
-    d2map.fbx_model.export(save_path=f'I:/maps/{d2map.pkg_name}_fbx/{d2map.name}.fbx', ascii_format=False)
+    d2map.fbx_model.export(save_path=f'I:/maps/{d2map.pkg_name}_fbx/{d2map.name}_efficient.fbx', ascii_format=False)
     print(f'Wrote fbx of {d2map.name}')
 
 
