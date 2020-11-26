@@ -59,7 +59,8 @@ def unpack_map(main_file, pkg_name, shaders):
 
     d2map.fbx_model = pfb.Model()
     d2map.fbx_model.create_node()
-
+    d2map.fbx_model.scene.GetRootNode().SetRotationActive(True)
+    d2map.fbx_model.scene.GetRootNode().SetGeometricRotation(fbx.FbxNode.eSourcePivot, fbx.FbxVector4(53, -77, 165))
     get_hex_from_pkg(d2map)
 
     get_transform_data(d2map)
@@ -148,14 +149,12 @@ def get_transforms_array(model_refs, copy_counts, rotations, location, map_scale
 
 def compute_coords(d2map: Map, shaders):
     nums = 0
+
+    d2map.fbx_model.scene.GetRootNode().SetGeometricRotation(fbx.FbxNode.eSourcePivot, fbx.FbxVector4(-90, -25, -80))
     for i, data in enumerate(d2map.copy_counts):
         model_ref = data['UID']
         copy_count = data['Count']
         print(f'Getting obj {i + 1}/{len(d2map.copy_counts)} {model_ref} {nums}')
-
-        # if i != 5:
-        #     nums += copy_count
-        #     continue
 
         model_file = met.ModelFile(uid=model_ref)
         model_file.get_model_data_file()
@@ -173,43 +172,28 @@ def compute_coords(d2map: Map, shaders):
                 if submesh.type == 769 or submesh.type == 770 or submesh.type == 778:
                     for cc in range(copy_count):
                         name = f'{model_ref}_{cc}_{j}_{k}'
-                        # print(name)
                         if cc == 0:
                             submesh.faces, max_vert_used = met.adjust_faces_data(submesh.faces, max_vert_used)
                             submesh.faces = met.shift_faces_down(submesh.faces)
                             mesh = create_mesh(d2map, submesh, name)
                         node = fbx.FbxNode.Create(d2map.fbx_model.scene, name)
-
-
+                        node.SetRotationActive(True)
                         rot = d2map.rotations[nums+cc]
-
-                        # This seems to remove the gimbal error but idc
-                        # f = rot[-1]
-                        # if f > 0:  # getting -0.0:
-                        #     rot = [-x for x in rot]
-
-                        # print(name, rot)
                         node.SetNodeAttribute(mesh)
-                        # Rotating for niceness
-                        # loc_rot = rotate_verts(d2map.locations[nums+cc], [0.7071068, 0, 0, 0.7071068], inverse=False)
                         loc_rot = d2map.locations[nums+cc]
                         r = scipy.spatial.transform.Rotation.from_quat(rot).as_euler('xyz', degrees=True)
-                        # i = fbx.FbxVector4(q[0], q[1], q[2])
-                        # Luckily order does not matter here as the rotation is always local not about origin + Converting to Eulerian
                         node.SetGeometricRotation(fbx.FbxNode.eSourcePivot, fbx.FbxVector4(-r[0]-90, r[1]-180, r[2]))
-                        node.SetGeometricTranslation(fbx.FbxNode.eSourcePivot, fbx.FbxVector4(loc_rot[0], loc_rot[1], loc_rot[2]))
-                        node.SetGeometricScaling(fbx.FbxNode.eSourcePivot, fbx.FbxVector4(d2map.scales[nums+cc], d2map.scales[nums+cc], d2map.scales[nums+cc]))
-                        d2map.fbx_model.scene.GetRootNode().AddChild(node)
-                        # rotate_verts(submesh, d2map.rotations[nums])
-                        # a = d2map.scales[nums]
-                        # get_map_scaled_verts(submesh, d2map.scales[nums])
-                        # get_map_moved_verts(submesh, d2map.locations[nums], d2map.scales[nums])
-                        # submesh.faces, max_vert_used = met.adjust_faces_data(submesh.faces, max_vert_used)
-                        # submesh.faces = met.shift_faces_down(submesh.faces)
-                        # add_model_to_fbx_map(d2map, model_file, submesh, f'{model_ref}_{copy_count}_{j}_{k}', shaders)
-                        # return
+                        node.SetGeometricTranslation(fbx.FbxNode.eSourcePivot, fbx.FbxVector4(loc_rot[0]*100, loc_rot[1]*100, loc_rot[2]*100))
+                        node.SetGeometricScaling(fbx.FbxNode.eSourcePivot, fbx.FbxVector4(d2map.scales[nums+cc]*100, d2map.scales[nums+cc]*100, d2map.scales[nums+cc]*100))
+
+                        tempnode = fbx.FbxNode.Create(d2map.fbx_model.scene, name + 'k')
+                        tempnode.AddChild(node)
+                        tempnode.SetRotationActive(True)
+                        tempnode.SetGeometricRotation(fbx.FbxNode.eSourcePivot,
+                                                  fbx.FbxVector4(-90, 180, 0))
+                        d2map.fbx_model.scene.GetRootNode().AddChild(tempnode)
         nums += copy_count
-        # return
+
 
 def get_map_scaled_verts(submesh: met.Submesh, map_scaler):
     for i in range(len(submesh.adjusted_pos_verts)):

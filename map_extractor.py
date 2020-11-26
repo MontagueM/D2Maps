@@ -151,9 +151,9 @@ def compute_coords(d2map: Map, shaders):
         copy_count = data['Count']
         print(f'Getting obj {i + 1}/{len(d2map.copy_counts)} {model_ref} {nums}')
 
-        # if i != 5:
-        #     nums += copy_count
-        #     continue
+        if i != 21 and i != 5:
+            nums += copy_count
+            continue
 
         model_file = met.ModelFile(uid=model_ref)
         model_file.get_model_data_file()
@@ -166,18 +166,18 @@ def compute_coords(d2map: Map, shaders):
 
         """Could make more efficient by just duping models instead of remaking them here."""
         max_vert_used = 0
-        for copy_count in range(copy_count):
+        for cc in range(copy_count):
             for j, model in enumerate(model_file.models):
                 for k, submesh in enumerate(model.submeshes):
                     if submesh.type == 769 or submesh.type == 770 or submesh.type == 778:
                         rotate_verts(submesh, d2map.rotations[nums])
                         a = d2map.scales[nums]
-                        print(f'{model_ref}_{copy_count}_{j}_{k}', d2map.rotations[nums])
+                        print(f'{model_ref}_{cc}_{j}_{k}', d2map.rotations[nums])
                         get_map_scaled_verts(submesh, d2map.scales[nums])
                         get_map_moved_verts(submesh, d2map.locations[nums], d2map.scales[nums])
                         submesh.faces, max_vert_used = met.adjust_faces_data(submesh.faces, max_vert_used)
                         submesh.faces = met.shift_faces_down(submesh.faces)
-                        add_model_to_fbx_map(d2map, model_file, submesh, f'{model_ref}_{copy_count}_{j}_{k}', shaders)
+                        add_model_to_fbx_map(d2map, model_file, submesh, f'{model_ref}_{cc}_{j}_{k}', shaders)
             nums += 1
         # return
 
@@ -253,7 +253,7 @@ def apply_shader(d2map: Map, submesh: met.Submesh, node):
 
 def create_mesh(d2map: Map, submesh: met.Submesh, name):
     mesh = fbx.FbxMesh.Create(d2map.fbx_model.scene, name)
-    controlpoints = [fbx.FbxVector4(x[0]*100, x[1]*100, x[2]*100) for x in submesh.adjusted_pos_verts]
+    controlpoints = [fbx.FbxVector4(-x[0]*100, x[2]*100, x[1]*100) for x in submesh.adjusted_pos_verts]
     for i, p in enumerate(controlpoints):
         mesh.SetControlPointAt(p, i)
     for face in submesh.faces:
