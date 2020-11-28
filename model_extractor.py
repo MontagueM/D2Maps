@@ -64,6 +64,7 @@ class ModelFile(File):
         self.model_data_file = File(name=self.get_model_data_file())
         self.model_file_hex = ''
         self.model_data_hex = ''
+        self.new_type = None
 
     def get_model_data_file(self):
         self.get_file_from_uid()
@@ -144,11 +145,11 @@ def get_model(model_file_hash):
     model_file.get_model_data_file()
     get_model_data(model_file, all_file_info)
     get_submeshes(model_file)
-    get_materials(model_file)
+    # get_materials(model_file)
     max_vert_used = 0
     for i, model in enumerate(model_file.models):
         for j, submesh in enumerate(model.submeshes):
-            if submesh.type == 769 or submesh.type == 770 or submesh.type == 778:
+            if submesh.type == 769 or submesh.type == 770 or submesh.type == 778 or submesh.type == 'New':
                 submesh.faces, max_vert_used = adjust_faces_data(submesh.faces, max_vert_used)
                 submesh.faces = shift_faces_down(submesh.faces)
                 export_fbx(model_file, submesh, f'{model_file_hash}_0_{i}_{j}')
@@ -186,15 +187,36 @@ def get_model_files(model_file: ModelFile):
     models = []
     for i in range(model_count):
         model = Model()
-        faces_hash = gf.get_flipped_hex(relevant_hex[32*i:32*i+8], 8)
-        pos_verts_file = gf.get_flipped_hex(relevant_hex[32*i+8:32*i+16], 8)
-        uv_verts_file = gf.get_flipped_hex(relevant_hex[32*i+16:32*i+24], 8)
-        if pos_verts_file == '' or faces_hash == '':
-            return
+        new_type = False
         # This is due to a new type of model/dynamics being added, ignoring for now
-        if faces_hash == '00000000' or pos_verts_file == '00000000':
-            print('NEW TYPEb')
-            return
+        # if faces_hash == '00000000' or pos_verts_file == '00000000':
+        #     print('NEW TYPEb')
+        #     return
+        # Some normal statics also include this table???
+        if '2F6D8080' in model_file.model_file_hex and '14008080' not in model_file.model_file_hex:
+            model_file.new_type = True
+            # Pretty sure this table only holds a single model file, so need to break after this.
+            # This table is more complicated (look at onenote) but this is all I think I need for it to work
+            print('New static type')
+            offset = model_file.model_file_hex.find('2F6D8080')+16
+            if offset == -1:
+                raise Exception('BROKEN NEW TYPE')
+            count = int(gf.get_flipped_hex(model_file.model_file_hex[offset+8:offset+16], 8), 16)  # I need count here as I think some files can have four
+            if count != 3:
+                print(f'Count != 3 (== {count}')
+            faces_hash = gf.get_flipped_hex(model_file.model_file_hex[offset+16:offset+24], 8)
+            pos_verts_file = gf.get_flipped_hex(model_file.model_file_hex[offset+24:offset+32], 8)
+            uv_verts_file = gf.get_flipped_hex(model_file.model_file_hex[offset+32:offset+40], 8)
+            if pos_verts_file == '' or faces_hash == '':
+                return
+
+        else:
+            # Normal static type
+            faces_hash = gf.get_flipped_hex(relevant_hex[32 * i:32 * i + 8], 8)
+            pos_verts_file = gf.get_flipped_hex(relevant_hex[32 * i + 8:32 * i + 16], 8)
+            uv_verts_file = gf.get_flipped_hex(relevant_hex[32 * i + 16:32 * i + 24], 8)
+            if pos_verts_file == '' or faces_hash == '':
+                return
         for j, hsh in enumerate([faces_hash, pos_verts_file, uv_verts_file]):
             hf = HeaderFile()
             hf.uid = gf.get_flipped_hex(hsh, 8)
@@ -212,41 +234,58 @@ def get_model_files(model_file: ModelFile):
                     hf.header = hf.get_header()
                     model.extra_verts_file = hf
         models.append(model)
+        if model_file.new_type:
+            break
     model_file.models = models
     return True
 
 
 def get_submeshes(model_file: ModelFile):
-    unk_entries_count = int(gf.get_flipped_hex(model_file.model_data_hex[128*2:128*2 + 8], 4), 16)
-    unk_entries_offset = 144
-
-    end_offset = unk_entries_offset + unk_entries_count * 6
-    end_place = int(model_file.model_data_hex[end_offset*2:].find('B89F8080')/2)
-    submesh_entries_count = int(gf.get_flipped_hex(model_file.model_data_hex[(end_offset + end_place + 4)*2:(end_offset + end_place + 6)*2], 4), 16)
-    submesh_entries_offset = end_offset + end_place + 20
-    submesh_entries_length = submesh_entries_count * 12
-    submesh_entries_hex = model_file.model_data_hex[submesh_entries_offset*2:submesh_entries_offset*2 + submesh_entries_length*2]
-    submesh_entries = [submesh_entries_hex[i:i+24] for i in range(0, len(submesh_entries_hex), 24)]
-
-    actual_submeshes = []
-    for e in submesh_entries:
-        entry = get_header(e, LODSubmeshEntry())
-        actual_submeshes.append(entry)
-
-    # TODO fix this double call
-    relevant_textures = get_materials(model_file)
-
-    for i, e in enumerate(actual_submeshes):
+    if model_file.new_type:
+        # Assuming we only want a single submesh as of now
         submesh = Submesh()
-        model = model_file.models[e.SecondIndexRef]
-        submesh.faces = model.faces[int(e.Offset/3):int((e.Offset + e.FacesLength)/3)]
+        model = model_file.models[0]
+        offset = model_file.model_file_hex.find('2F6D8080')+16
+        a = model_file.model_file_hex[offset+48:offset+56]
+        faces_offset = int(gf.get_flipped_hex(model_file.model_file_hex[offset+48:offset+56], 8), 16)
+        faces_length = int(gf.get_flipped_hex(model_file.model_file_hex[offset+56:offset+64], 8), 16)
+        submesh.faces = model.faces[int(faces_offset / 3):int((faces_offset + faces_length) / 3)]
         submesh.pos_verts = trim_verts_data(model.pos_verts, submesh.faces)
         submesh.uv_verts = trim_verts_data(model.uv_verts, submesh.faces)
         submesh.norm_verts = trim_verts_data(model.norm_verts, submesh.faces)
-        submesh.type = e.EntryType
-        if i in relevant_textures.keys():
-            submesh.material = File(name=relevant_textures[i])
-            model.submeshes.append(submesh)
+        submesh.type = 'New'
+        model.submeshes.append(submesh)
+    else:
+        unk_entries_count = int(gf.get_flipped_hex(model_file.model_data_hex[128*2:128*2 + 8], 4), 16)
+        unk_entries_offset = 144
+
+        end_offset = unk_entries_offset + unk_entries_count * 6
+        end_place = int(model_file.model_data_hex[end_offset*2:].find('B89F8080')/2)
+        submesh_entries_count = int(gf.get_flipped_hex(model_file.model_data_hex[(end_offset + end_place + 4)*2:(end_offset + end_place + 6)*2], 4), 16)
+        submesh_entries_offset = end_offset + end_place + 20
+        submesh_entries_length = submesh_entries_count * 12
+        submesh_entries_hex = model_file.model_data_hex[submesh_entries_offset*2:submesh_entries_offset*2 + submesh_entries_length*2]
+        submesh_entries = [submesh_entries_hex[i:i+24] for i in range(0, len(submesh_entries_hex), 24)]
+
+        actual_submeshes = []
+        for e in submesh_entries:
+            entry = get_header(e, LODSubmeshEntry())
+            actual_submeshes.append(entry)
+
+        # TODO fix this double call
+        relevant_textures = get_materials(model_file)
+
+        for i, e in enumerate(actual_submeshes):
+            submesh = Submesh()
+            model = model_file.models[e.SecondIndexRef]
+            submesh.faces = model.faces[int(e.Offset/3):int((e.Offset + e.FacesLength)/3)]
+            submesh.pos_verts = trim_verts_data(model.pos_verts, submesh.faces)
+            submesh.uv_verts = trim_verts_data(model.uv_verts, submesh.faces)
+            submesh.norm_verts = trim_verts_data(model.norm_verts, submesh.faces)
+            submesh.type = e.EntryType
+            if i in relevant_textures.keys():
+                submesh.material = File(name=relevant_textures[i])
+                model.submeshes.append(submesh)
 
 
 def get_materials(model_file: ModelFile):
@@ -768,4 +807,4 @@ if __name__ == '__main__':
     all_file_info = {x[0]: dict(zip(['RefID', 'RefPKG', 'FileType'], x[1:])) for x in
                      pkg_db.get_entries_from_table('Everything', 'FileName, RefID, RefPKG, FileType')}
 
-    get_model('3348D580')
+    get_model('448FC680')

@@ -155,7 +155,8 @@ def compute_coords(d2map: Map, shaders):
         model_ref = data['UID']
         copy_count = data['Count']
         print(f'Getting obj {i + 1}/{len(d2map.copy_counts)} {model_ref} {nums}')
-
+        if model_ref == '3819C680':
+            a = 0
         model_file = met.ModelFile(uid=model_ref)
         model_file.get_model_data_file()
         ret = met.get_model_data(model_file, all_file_info)
@@ -163,13 +164,13 @@ def compute_coords(d2map: Map, shaders):
             nums += copy_count
             continue
         met.get_submeshes(model_file)
-        met.get_materials(model_file)
+        # met.get_materials(model_file)
 
         """Could make more efficient by just duping models instead of remaking them here."""
         max_vert_used = 0
         for j, model in enumerate(model_file.models):
             for k, submesh in enumerate(model.submeshes):
-                if submesh.type == 769 or submesh.type == 770 or submesh.type == 778:
+                if submesh.type == 769 or submesh.type == 770 or submesh.type == 778 or submesh.type == 'New':
                     for cc in range(copy_count):
                         name = f'{model_ref}_{cc}_{j}_{k}'
                         if cc == 0:
@@ -340,7 +341,7 @@ def unpack_folder(pkg_name, shaders):
             # a = [x.split('.')[0] for x in os.listdir('C:\d2_maps/orphaned_0932_fbx/')]
             # if file_name in [x.split('.')[0] for x in os.listdir(f'C:\d2_maps/{pkg_name}_fbx/')]:
             #     continue
-            if '0C7C' not in file_name:
+            if '0178-04F9' not in file_name:
                 continue
             print(f'Unpacking {file_name}')
             unpack_map(file_name, pkg_name, shaders)
@@ -352,7 +353,7 @@ if __name__ == '__main__':
     pkg_db.start_db_connection()
     all_file_info = {x[0]: dict(zip(['RefID', 'RefPKG', 'FileType'], x[1:])) for x in
                      pkg_db.get_entries_from_table('Everything', 'FileName, RefID, RefPKG, FileType')}
-    unpack_folder('europa_0232', shaders=False)
+    unpack_folder('europa_0178', shaders=False)
 
 """
 Ideas:
