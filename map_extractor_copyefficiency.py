@@ -53,7 +53,7 @@ def get_header(file_hex, header):
     return header
 
 
-def unpack_map(main_file, pkg_name, shaders):
+def unpack_map(main_file, pkg_name, unreal, shaders):
     d2map = Map(name=main_file)
     gf.mkdir(f'I:/maps/{pkg_name}_fbx/')
 
@@ -67,7 +67,7 @@ def unpack_map(main_file, pkg_name, shaders):
     get_model_refs(d2map)
     get_copy_counts(d2map)
 
-    compute_coords(d2map, shaders)
+    compute_coords(d2map, unreal, shaders)
     if shaders:
         get_shader_info(d2map)
     write_fbx(d2map)
@@ -147,7 +147,7 @@ def get_transforms_array(model_refs, copy_counts, rotations, location, map_scale
     return transforms_array
 
 
-def compute_coords(d2map: Map, shaders):
+def compute_coords(d2map: Map, unreal, shaders):
     nums = 0
 
     d2map.fbx_model.scene.GetRootNode().SetGeometricRotation(fbx.FbxNode.eSourcePivot, fbx.FbxVector4(-90, -25, -80))
@@ -187,12 +187,15 @@ def compute_coords(d2map: Map, shaders):
                         node.SetGeometricTranslation(fbx.FbxNode.eSourcePivot, fbx.FbxVector4(loc_rot[0]*100, loc_rot[1]*100, loc_rot[2]*100))
                         node.SetGeometricScaling(fbx.FbxNode.eSourcePivot, fbx.FbxVector4(d2map.scales[nums+cc]*100, d2map.scales[nums+cc]*100, d2map.scales[nums+cc]*100))
 
-                        tempnode = fbx.FbxNode.Create(d2map.fbx_model.scene, name + 'k')
-                        tempnode.AddChild(node)
-                        tempnode.SetRotationActive(True)
-                        tempnode.SetGeometricRotation(fbx.FbxNode.eSourcePivot,
-                                                  fbx.FbxVector4(-90, 180, 0))
-                        d2map.fbx_model.scene.GetRootNode().AddChild(tempnode)
+                        if unreal:
+                            d2map.fbx_model.scene.GetRootNode().AddChild(node)
+                        else:
+                            tempnode = fbx.FbxNode.Create(d2map.fbx_model.scene, name + 'k')
+                            tempnode.AddChild(node)
+                            tempnode.SetRotationActive(True)
+                            tempnode.SetGeometricRotation(fbx.FbxNode.eSourcePivot,
+                                                      fbx.FbxVector4(-90, 180, 0))
+                            d2map.fbx_model.scene.GetRootNode().AddChild(tempnode)
         nums += copy_count
 
 
@@ -331,7 +334,7 @@ def write_fbx(d2map: Map):
     print(f'Wrote fbx of {d2map.name}')
 
 
-def unpack_folder(pkg_name, shaders):
+def unpack_folder(pkg_name, unreal, shaders):
     entries_refid = {x: y for x, y in pkg_db.get_entries_from_table(pkg_name, 'FileName, RefID') if y == '0x13AD'}
     entries_refpkg = {x: y for x, y in pkg_db.get_entries_from_table(pkg_name, 'FileName, RefPKG') if y == '0x0004'}
     entries_size = {x: y for x, y in pkg_db.get_entries_from_table(pkg_name, 'FileName, FileSizeB')}
@@ -341,10 +344,10 @@ def unpack_folder(pkg_name, shaders):
             # a = [x.split('.')[0] for x in os.listdir('C:\d2_maps/orphaned_0932_fbx/')]
             # if file_name in [x.split('.')[0] for x in os.listdir(f'C:\d2_maps/{pkg_name}_fbx/')]:
             #     continue
-            if '0178-04F9' not in file_name:
-                continue
+            # if '07A0' not in file_name:
+            #     continue
             print(f'Unpacking {file_name}')
-            unpack_map(file_name, pkg_name, shaders)
+            unpack_map(file_name, pkg_name, unreal, shaders)
 
 
 if __name__ == '__main__':
@@ -353,9 +356,4 @@ if __name__ == '__main__':
     pkg_db.start_db_connection()
     all_file_info = {x[0]: dict(zip(['RefID', 'RefPKG', 'FileType'], x[1:])) for x in
                      pkg_db.get_entries_from_table('Everything', 'FileName, RefID, RefPKG, FileType')}
-    unpack_folder('europa_0178', shaders=False)
-
-"""
-Ideas:
-- load 0369-1C76 + 1705 + 1364 for a lookout from the hangar area in RTX
-"""
+    unpack_folder('edz_02bc', unreal=False, shaders=False)
