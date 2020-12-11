@@ -1,7 +1,7 @@
 from dataclasses import dataclass, fields
 import numpy as np
 import struct
-import model_extractor as met
+import static_model_extractor as met
 import scipy.spatial
 import pkg_db
 import fbx

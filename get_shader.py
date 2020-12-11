@@ -1,4 +1,4 @@
-import model_extractor as met
+import static_model_extractor as met
 import gf
 import os
 import time
@@ -30,8 +30,14 @@ def get_shader_from_mat(material, textures, cbuffer_offsets, all_file_info, cust
 def get_decompiled_hlsl(shader_ref, custom_dir):
     gf.mkdir(custom_dir)
     pkg_name = gf.get_pkg_name(shader_ref)
-    os.system(f'start hlsl/decomp.exe -D C:/d2_output/{pkg_name}/{shader_ref}.bin')
-    time.sleep(1)
+
+
+    os.system(f'start hlsl/decomp.exe -D I:/d2_output_3_0_0_4/{pkg_name}/{shader_ref}.bin')
+    num = len(os.listdir(f'I:/d2_output_3_0_0_4/{pkg_name}/'))
+    while True:
+        if num != len(os.listdir(f'I:/d2_output_3_0_0_4/{pkg_name}/')):
+            break
+
     shutil.move(f'C:/d2_output/{pkg_name}/{shader_ref}.hlsl', f'{custom_dir}/{shader_ref}.hlsl')
     print(f'Decompiled and moved shader {shader_ref}.hlsl')
 

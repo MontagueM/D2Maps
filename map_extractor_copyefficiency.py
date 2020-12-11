@@ -1,7 +1,7 @@
 from dataclasses import dataclass, fields
 import numpy as np
 import struct
-import model_extractor as met
+import static_model_extractor as met
 import scipy.spatial
 import pkg_db
 import fbx
@@ -74,10 +74,10 @@ def unpack_map(main_file, pkg_name, unreal, shaders):
 
 
 def get_hex_from_pkg(d2map: Map):
-    main_hex = gf.get_hex_data(f'I:/d2_output_3_0_0_4/{d2map.get_pkg_name()}/{d2map.name}.bin')
+    main_hex = gf.get_hex_data(f'I:/d2_output_3_0_1_0/{d2map.get_pkg_name()}/{d2map.name}.bin')
     file_hash = main_hex[24*2:24*2+8]
     scales_file = met.File(name=gf.get_file_from_hash(file_hash))
-    d2map.scales_hex = gf.get_hex_data(f'I:/d2_output_3_0_0_4/{scales_file.get_pkg_name()}/{scales_file.name}.bin')[48 * 2:]
+    d2map.scales_hex = gf.get_hex_data(f'I:/d2_output_3_0_1_0/{scales_file.get_pkg_name()}/{scales_file.name}.bin')[48 * 2:]
 
     transform_count = int(gf.get_flipped_hex(main_hex[64*2:64*2+4], 4), 16)
     transform_offset = int(main_hex.find('406D8080')/2+8)
@@ -190,12 +190,9 @@ def compute_coords(d2map: Map, unreal, shaders):
                         if unreal:
                             d2map.fbx_model.scene.GetRootNode().AddChild(node)
                         else:
-                            tempnode = fbx.FbxNode.Create(d2map.fbx_model.scene, name + 'k')
-                            tempnode.AddChild(node)
-                            tempnode.SetRotationActive(True)
-                            tempnode.SetGeometricRotation(fbx.FbxNode.eSourcePivot,
-                                                      fbx.FbxVector4(-90, 180, 0))
-                            d2map.fbx_model.scene.GetRootNode().AddChild(tempnode)
+                            # Lcl seems to be the only thing that actually works around here
+                            node.LclRotation.Set(fbx.FbxDouble3(-90, 180, 0))
+                            d2map.fbx_model.scene.GetRootNode().AddChild(node)
         nums += copy_count
 
 
@@ -344,8 +341,8 @@ def unpack_folder(pkg_name, unreal, shaders):
             # a = [x.split('.')[0] for x in os.listdir('C:\d2_maps/orphaned_0932_fbx/')]
             # if file_name in [x.split('.')[0] for x in os.listdir(f'C:\d2_maps/{pkg_name}_fbx/')]:
             #     continue
-            # if '07A0' not in file_name:
-            #     continue
+            if '0A37' not in file_name:
+                continue
             print(f'Unpacking {file_name}')
             unpack_map(file_name, pkg_name, unreal, shaders)
 
@@ -356,4 +353,4 @@ if __name__ == '__main__':
     pkg_db.start_db_connection()
     all_file_info = {x[0]: dict(zip(['RefID', 'RefPKG', 'FileType'], x[1:])) for x in
                      pkg_db.get_entries_from_table('Everything', 'FileName, RefID, RefPKG, FileType')}
-    unpack_folder('edz_02bc', unreal=False, shaders=False)
+    unpack_folder('city_tower_d2_01ad', unreal=False, shaders=False)

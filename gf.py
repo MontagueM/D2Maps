@@ -44,7 +44,7 @@ def get_pkg_name(file):
         print(f'{file} is invalid.')
         return None
     pkg_id = file.split('-')[0]
-    for folder in os.listdir('I:/d2_output_3_0_0_4/'):
+    for folder in os.listdir('I:/d2_output_3_0_1_0/'):
         if pkg_id.lower() in folder.lower():
             pkg_name = folder
             break
@@ -92,5 +92,5 @@ class File:
             self.get_pkg_name()
         if not self.name:
             self.get_file_from_uid()
-        self.fhex = get_hex_data(f'I:/d2_output_3_0_0_4/{self.pkg_name}/{self.name}.bin')
+        self.fhex = get_hex_data(f'I:/d2_output_3_0_1_0/{self.pkg_name}/{self.name}.bin')
         return self.fhex

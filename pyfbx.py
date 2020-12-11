@@ -1,5 +1,3 @@
-from __future__ import print_function
-
 import fbx
 import sys
 
@@ -48,9 +46,6 @@ class Scene:
 
         self.root_node = Node(self, name + "_root_node")
         self.root_node._me = self._me.GetRootNode()
-
-    def create_node(self, name=""):
-        node = Node(self, name)
 
 
 class Mesh:
@@ -150,14 +145,6 @@ class Model:
         self.mesh.SetControlPointAt(fbx.FbxVector4(x, y, z), Model.cpt_count)
         Model.cpt_count += 1
 
-    def get_rnode_translation(self):
-        """Get the root node's translation."""
-        return Model.root_node.LclTranslation.Get()
-
-    def get_node_translation(self):
-        """Get the child node's translation."""
-        return self.node.LclTranslation.Get()
-
     def set_rnode_translation(self, coordinates):
         """Set the root node translation."""
         Model.root_node.LclTranslation.Set(fbx.FbxDouble3(
@@ -169,6 +156,14 @@ class Model:
     def set_node_translation(self, coordinates):
         """Set the child node translation."""
         self.node.LclTranslation.Set(fbx.FbxDouble3(
+            float(coordinates[0]),
+            float(coordinates[1]),
+            float(coordinates[2])
+        ))
+
+    def set_node_rotation(self, coordinates):
+        """Set the child node translation."""
+        self.node.LclRotation.Set(fbx.FbxDouble3(
             float(coordinates[0]),
             float(coordinates[1]),
             float(coordinates[2])
