@@ -16,7 +16,7 @@ has the actual image data which uses the header data to transcribe that data to 
 
 @dataclass
 class ImageHeader:
-    Field0: np.uint32 = np.uint32(0)  # 0
+    TargetSize: np.uint32 = np.uint32(0)  # 0
     TextureFormat: np.uint32 = np.uint32(0)  # 4
     Field8: np.uint32 = np.uint32(0)  # 8
     FieldC:  np.uint32 = np.uint32(0)  # C
@@ -28,7 +28,8 @@ class ImageHeader:
     Width: np.uint16 = np.uint16(0)  # 22
     Height: np.uint16 = np.uint16(0)  # 24
     Field26: np.uint16 = np.uint16(0)
-    Field28: np.uint32 = np.uint32(0)
+    TA: np.uint16 = np.uint16(0)  # 28
+    Field2A: np.uint16 = np.uint16(0)
     Field2C: np.uint32 = np.uint32(0)
     Field30: np.uint32 = np.uint32(0)
     Field34: np.uint32 = np.uint32(0)
@@ -105,7 +106,7 @@ def get_image_from_file(file_path, all_file_info, save_path=None):
     ref_pkg = gf.get_pkg_name(ref_file_name)
     if entry['FileType'] == 'Texture Header':
         header_hex = gf.get_hex_data(file_path)
-        data_hex = gf.get_hex_data(f'I:/d2_output_3_0_1_0/{ref_pkg}/{ref_file_name}.bin')
+        data_hex = gf.get_hex_data(f'I:/d2_output_3_0_1_3/{ref_pkg}/{ref_file_name}.bin')
     elif entry['FileType'] == 'Texture Data':
         print('Only pass through header please, cba to fix this.')
         return
@@ -119,14 +120,14 @@ def get_image_from_file(file_path, all_file_info, save_path=None):
     if large_tex_hash != 'FFFFFFFF':
         large_file = gf.get_file_from_hash(large_tex_hash)
         pkg_name = gf.get_pkg_name(large_file)
-        data_hex = gf.get_hex_data(f'I:/d2_output_3_0_1_0/{pkg_name}/{large_file}.bin')
+        data_hex = gf.get_hex_data(f'I:/d2_output_3_0_1_3/{pkg_name}/{large_file}.bin')
     print(file_name, ref_file_name)
     img = get_image_from_data(header, dimensions, data_hex, save_path)
     if img:
         if save_path:
             img.save(f'{save_path}/{file_name}.png')
         else:
-            img.save(f'I:/d2_output_3_0_1_0_images/{file_pkg}/{file_name}.png')
+            img.save(f'I:/d2_output_3_0_1_3_images/{file_pkg}/{file_name}.png')
             img.show()
 
 
@@ -153,21 +154,24 @@ def bc_decomp(header, data_hex, save_path):
 
     # block-compressed
     if 'BC' in form:
-        pitch_or_linear_size = conv(max(1, (header.Width+3)/4)*block_size)
+        pitch_or_linear_size = max(1, (header.Width+3)/4)*block_size
     elif 'R8GB_B8G8' in form or 'G8R8_G8B8' in form:
         # R8G8_B8G8 or G8R8_G8B8
-        pitch_or_linear_size = conv(((header.Width + 1) >> 1) * 4)
+        pitch_or_linear_size =((header.Width + 1) >> 1) * 4
     else:
         # Any other
+        print('other')
         bits_per_pixel = 8  # Assuming its always 8 here which it should be as non-HDR
         # pitch_or_linear_size = (header.Width * bits_per_pixel + 8) / 8
         pitch_or_linear_size = ((header.Width + 1) >> 1) * 4
+        # pitch_or_linear_size = header.Width * 32
         # pitch_or_linear_size = 0
+
 
     # Compressed
     text_header1 = f'444453207C00000007100800{conv(header.Height)}{conv(header.Width)}{pitch_or_linear_size}000000000000000000000000000000000000000000000000000' \
-                  '000000000000000000000000000000000000000000000000000020000000050000004458313000000000000000000000000' \
-                  f'00000000000000000001000000000000000000000000000000000000{header.TextureFormat}03000000000000000100000001000000'
+                  '0000000000000000000000000000000000000000000000000000020000000050000004458313000000000000000000000000' \
+                  f'000000000000000000010000000000000000000000000000000000000{conv(header.TextureFormat)}0300000000000000{conv(header.TA)}01000000'
 
     # Uncompressed
     text_header2 = f'444453207C0000000E100000{conv(header.Height)}{conv(header.Width)}{pitch_or_linear_size}000000000000000000000000000000000000000000000000000' \
@@ -184,13 +188,22 @@ def bc_decomp(header, data_hex, save_path):
     bc1_header.dwMipMapCount = 0
     bc1_header.dwReserved1 = [0]*11
     bc1_header.dwPFSize = 32
-    bc1_header.dwPFFlags = 0x1 + 0x40  # contains alpha data + contains uncompressed RGB data
+    bc1_header.dwPFRGBBitCount = 0
+    bc1_header.dwPFRGBBitCount = 32
+    bc1_header.dwPFRBitMask = 0xFF  # RGBA so FF first, but this is endian flipped
+    bc1_header.dwPFGBitMask = 0xFF00
+    bc1_header.dwPFBBitMask = 0xFF0000
+    bc1_header.dwPFABitMask = 0xFF000000
+
+    ''' Uncompressed
     bc1_header.dwPFFourCC = 0
     bc1_header.dwPFRGBBitCount = 32
-    bc1_header.dwPFRBitMask = 0x000000FF  # RGBA so FF first, but this is endian flipped
-    bc1_header.dwPFGBitMask = 0x0000FF00
-    bc1_header.dwPFBBitMask = 0x00FF0000
+    bc1_header.dwPFRBitMask = 0xFF  # RGBA so FF first, but this is endian flipped
+    bc1_header.dwPFGBitMask = 0xFF00
+    bc1_header.dwPFBBitMask = 0xFF0000
     bc1_header.dwPFABitMask = 0xFF000000
+    '''
+
     # bc1_header.dwCaps = 0x1000 + 0x8
     # bc1_header.dwCaps2 = 0x200 + 0x400 + 0x800 + 0x1000 + 0x2000 + 0x4000 + 0x8000  # All faces for cubemap
     bc1_header.dwCaps = 0x1000
@@ -198,37 +211,52 @@ def bc_decomp(header, data_hex, save_path):
     bc1_header.dwCaps3 = 0
     bc1_header.dwCaps4 = 0
     bc1_header.dwReserved2 = 0
-    bc1_header.dxgiFormat = header.TextureFormat
-    bc1_header.resourceDimension = 3  # DDS_DIMENSION_TEXTURE2D
-    bc1_header.miscFlag = 0
-    # int(((int(bc1_header.dwWidth) * int(bc1_header.dwHeight)) + 320) / c_data_size)
-    bc1_header.arraySize = 1
-    bc1_header.miscFlags2 = 0x1 #?
-    print(f'Array size {bc1_header.arraySize}')
+    if 'BC' in form:
+        bc1_header.dwPFFlags = 0x1 + 0x4  # contains alpha data + contains uncompressed RGB data
+        bc1_header.dwPFFourCC = int.from_bytes(b'\x44\x58\x31\x30', byteorder='little')
+        bc1_header.dxgiFormat = header.TextureFormat
+        bc1_header.resourceDimension = 3  # DDS_DIMENSION_TEXTURE2D
+        if header.TA % 6 == 0:
+            bc1_header.miscFlag = 4
+            bc1_header.arraySize = int(header.TA / 6)
+        else:
+            bc1_header.miscFlag = 0
+            bc1_header.arraySize = 1
+        # int(((int(bc1_header.dwWidth) * int(bc1_header.dwHeight)) + 320) / c_data_size)
+    else:
+        bc1_header.dwPFFlags = 0x1 + 0x40  # contains alpha data + contains uncompressed RGB data
+        bc1_header.dwPFFourCC = 0
+        bc1_header.miscFlag = 0
+        bc1_header.arraySize = 1
+        bc1_header.miscFlags2 = 0x1 #?
+    # print(f'Array size {bc1_header.arraySize}')
+    # if 'BC' in DXGI_FORMAT[header.TextureFormat]:
+    #     with open(save_path, 'wb') as b:
+    #         b.write(binascii.unhexlify(text_header1))
+    #         b.write(binascii.unhexlify(data_hex))
+    # else:
     write_file(bc1_header, header, data_hex, save_path)
-    # with open(save_path, 'wb') as b:
-    #     b.write(binascii.unhexlify(text_header2))
-    #     b.write(binascii.unhexlify(data_hex))
+
 
 
 def write_file(header, ogheader, file_hex, save_path):
     # DDS currently broken
-    # with open(save_path, 'wb') as b:
-    #     for f in fields(header):
-    #         if f.type == np.uint32:
-    #             flipped = "".join(gf.get_flipped_hex(gf.fill_hex_with_zeros(hex(np.uint32(getattr(header, f.name)))[2:], 8), 8))
-    #         elif f.type == List[np.uint32]:
-    #             flipped = ''
-    #             for val in getattr(header, f.name):
-    #                 flipped += "".join(
-    #                     gf.get_flipped_hex(gf.fill_hex_with_zeros(hex(np.uint32(val))[2:], 8), 8))
-    #         else:
-    #             print(f'ERROR {f.type}')
-    #             return
-    #         b.write(binascii.unhexlify(flipped))
-    #     b.write(binascii.unhexlify(file_hex))
-    img = Image.frombytes('RGBA', [ogheader.Width, ogheader.Height], bytes.fromhex(file_hex))
-    img.save(save_path[:-4] + '.png')
+    with open(save_path, 'wb') as b:
+        for f in fields(header):
+            if f.type == np.uint32:
+                flipped = "".join(gf.get_flipped_hex(gf.fill_hex_with_zeros(hex(np.uint32(getattr(header, f.name)))[2:], 8), 8))
+            elif f.type == List[np.uint32]:
+                flipped = ''
+                for val in getattr(header, f.name):
+                    flipped += "".join(
+                        gf.get_flipped_hex(gf.fill_hex_with_zeros(hex(np.uint32(val))[2:], 8), 8))
+            else:
+                print(f'ERROR {f.type}')
+                return
+            b.write(binascii.unhexlify(flipped))
+        b.write(binascii.unhexlify(file_hex))
+    # img = Image.frombytes('RGBA', [ogheader.Width, ogheader.Height], bytes.fromhex(file_hex))
+    # img.save(save_path[:-4] + '.png')
 
 
 def get_image_from_data(header, dimensions, data_hex, save_path):
@@ -236,7 +264,9 @@ def get_image_from_data(header, dimensions, data_hex, save_path):
     print(format)
     img = None
     if 'R8G8B8A8' in format:
+        bc_decomp(header, data_hex, save_path)
         try:
+            return
             img = Image.frombytes('RGBA', dimensions, bytes.fromhex(data_hex))
             img.save(save_path[:-4] + '.png')
         except ValueError:
@@ -246,6 +276,10 @@ def get_image_from_data(header, dimensions, data_hex, save_path):
         # return False
     # return img
 
-# img = '02B6-0A70'
-# pkg = gf.get_pkg_name(img)
-# get_image_from_file(f'I:/d2_output_3_0_1_0/{pkg}/{img}.bin', f'imgtests/{img}.dds')
+if __name__ == '__main__':
+    img = '0172-06AC'
+    pkg = gf.get_pkg_name(img)
+    pkg_db.start_db_connection()
+    all_file_info = {x: y for x,y in {x[0]: dict(zip(['RefID', 'RefPKG', 'FileType'], x[1:])) for x in
+                    pkg_db.get_entries_from_table('Everything', 'FileName, RefID, RefPKG, FileType')}.items() if y['FileType'] == 'Texture Header'}
+    get_image_from_file(f'I:/d2_output_3_0_1_3/{pkg}/{img}.bin', all_file_info, f'imgtests/edz_0219/{img}.dds')
