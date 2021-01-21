@@ -9,6 +9,7 @@ import pyfbx as pfb
 import gf
 import quaternion
 import math
+from multiprocessing.dummy import Pool as ThreadPool
 
 
 @dataclass
@@ -22,38 +23,36 @@ class CountEntry:
 class Map(met.File):
     def __init__(self, name):
         super(Map, self).__init__(name=name)
-        self.scales_hex = ''
+        self.scales_fb = ''
         self.scales = []
-        self.transforms_hex = ''
+        self.transforms_fb = ''
         self.rotations = []
         self.locations = []
-        self.model_refs_hex = ''
+        self.model_refs_fb = ''
         self.model_refs = []
-        self.copy_counts_hex = ''
+        self.copy_counts_fb = ''
         self.copy_counts = []
         self.fbx_model = None
         self.materials = {}
         self.material_files = []
 
 
-def get_header(file_hex, header):
+def get_header(fb, header):
     # The header data is 0x16F bytes long, so we need to x2 as python reads each nibble not each byte
 
     for f in fields(header):
         if f.type == np.uint32:
-            flipped = "".join(gf.get_flipped_hex(file_hex, 8))
-            value = np.uint32(int(flipped, 16))
+            value = gf.get_uint32(fb, 0)
             setattr(header, f.name, value)
-            file_hex = file_hex[8:]
+            fb = fb[4:]
         elif f.type == np.uint16:
-            flipped = "".join(gf.get_flipped_hex(file_hex, 4))
-            value = np.uint16(int(flipped, 16))
+            value = gf.get_uint16(fb, 0)
             setattr(header, f.name, value)
-            file_hex = file_hex[4:]
+            fb = fb[2:]
     return header
 
 
-def unpack_map(main_file, pkg_name, unreal, shaders):
+def unpack_map(main_file, pkg_name, unreal, shaders, apply_textures):
     d2map = Map(name=main_file)
     gf.mkdir(f'I:/maps/{pkg_name}_fbx/')
 
@@ -61,70 +60,70 @@ def unpack_map(main_file, pkg_name, unreal, shaders):
     d2map.fbx_model.create_node()
     d2map.fbx_model.scene.GetRootNode().SetRotationActive(True)
     d2map.fbx_model.scene.GetRootNode().SetGeometricRotation(fbx.FbxNode.eSourcePivot, fbx.FbxVector4(53, -77, 165))
-    get_hex_from_pkg(d2map)
+    get_fb_from_pkg(d2map)
 
     get_transform_data(d2map)
     get_model_refs(d2map)
     get_copy_counts(d2map)
 
-    compute_coords(d2map, unreal, shaders)
+    compute_coords(d2map, unreal, shaders, apply_textures)
     if shaders:
         get_shader_info(d2map)
     write_fbx(d2map)
 
 
-def get_hex_from_pkg(d2map: Map):
-    main_hex = gf.get_hex_data(f'I:/d2_output_3_0_1_0/{d2map.get_pkg_name()}/{d2map.name}.bin')
-    file_hash = main_hex[24*2:24*2+8]
-    scales_file = met.File(name=gf.get_file_from_hash(file_hash))
-    d2map.scales_hex = gf.get_hex_data(f'I:/d2_output_3_0_1_0/{scales_file.get_pkg_name()}/{scales_file.name}.bin')[48 * 2:]
+def get_fb_from_pkg(d2map: Map):
+    main_fb = open(f'I:/d2_output_3_0_2_0/{d2map.get_pkg_name()}/{d2map.name}.bin', 'rb').read()
+    # file_hash = main_fb[24:24+4]
+    # scales_file = met.File(name=gf.get_file_from_hash(file_hash.hex()))
+    # d2map.scales_fb = open(f'I:/d2_output_3_0_2_0/{scales_file.get_pkg_name()}/{scales_file.name}.bin', 'rb').read()[48:]
 
-    transform_count = int(gf.get_flipped_hex(main_hex[64*2:64*2+4], 4), 16)
-    transform_offset = int(main_hex.find('406D8080')/2+8)
+    transform_count = gf.get_uint32(main_fb, 64)
+    transform_offset = int(main_fb.find(b'\x40\x6D\x80\x80')+8)
     transform_length = transform_count*48
-    d2map.transforms_hex = main_hex[transform_offset*2:transform_offset*2 + transform_length*2]
+    d2map.transforms_fb = main_fb[transform_offset:transform_offset + transform_length]
 
-    entry_count = int(gf.get_flipped_hex(main_hex[88*2:88*2+4], 4), 16)
+    entry_count = gf.get_uint32(main_fb, 88)
     model_offset = transform_offset + transform_length + 32
     model_length = entry_count * 4
-    d2map.model_refs_hex = main_hex[model_offset*2:model_offset*2 + model_length*2]
+    d2map.model_refs_fb = main_fb[model_offset:model_offset + model_length]
 
-    copy_offset = model_offset + model_length + int(main_hex[model_offset*2+model_length*2:].find('286D8080')/2) + 8
-    d2map.copy_counts_hex = main_hex[copy_offset*2:]
+    copy_offset = model_offset + model_length + int(main_fb[model_offset+model_length:].find(b'\x28\x6D\x80\x80')) + 8
+    d2map.copy_counts_fb = main_fb[copy_offset:]
 
 
 def get_transform_data(d2map: Map):
-    rotation_entries_hex = [d2map.transforms_hex[i:i + 48 * 2] for i in range(0, len(d2map.transforms_hex), 48 * 2)]
+    rotation_entries_fb = [d2map.transforms_fb[i:i + 48] for i in range(0, len(d2map.transforms_fb), 48)]
 
-    for e in rotation_entries_hex:
-        h = e[:16 * 2]
-        hex_floats = [h[i:i + 8] for i in range(0, len(h), 8)]
+    for e in rotation_entries_fb:
+        h = e[:16]
+        fb_floats = [h[i:i + 4] for i in range(0, len(h), 4)]
         floats = []
-        for hex_float in hex_floats:
-            float_value = round(struct.unpack('f', bytes.fromhex(hex_float))[0], 6)
+        for fb_float in fb_floats:
+            float_value = round(struct.unpack('f', fb_float)[0], 6)
             floats.append(float_value)
         d2map.rotations.append(floats)
 
-        float_value = round(struct.unpack('f', bytes.fromhex(e[28*2:32*2]))[0], 6)
+        float_value = round(struct.unpack('f', e[28:32])[0], 6)
         d2map.scales.append(float_value)
 
-        loc_hex = e[16 * 2:28 * 2]
-        loc_hex_floats = [loc_hex[i:i + 8] for i in range(0, len(loc_hex), 8)]
+        loc_fb = e[16:28]
+        loc_fb_floats = [loc_fb[i:i + 4] for i in range(0, len(loc_fb), 4)]
         location = []
-        for hex_float in loc_hex_floats:
-            float_value = round(struct.unpack('f', bytes.fromhex(hex_float))[0], 6)
+        for fb_float in loc_fb_floats:
+            float_value = round(struct.unpack('f', fb_float)[0], 6)
             location.append(float_value)
         d2map.locations.append(location)
 
 
 def get_model_refs(d2map: Map):
-    d2map.model_refs = [d2map.model_refs_hex[i:i + 4 * 2] for i in range(0, len(d2map.model_refs_hex), 4 * 2)]
+    d2map.model_refs = [d2map.model_refs_fb[i:i + 4].hex().upper() for i in range(0, len(d2map.model_refs_fb), 4)]
 
 
 def get_copy_counts(d2map: Map):
-    entries_hex = [d2map.copy_counts_hex[i:i + 8 * 2] for i in range(0, len(d2map.copy_counts_hex), 8 * 2)]
+    entries_fb = [d2map.copy_counts_fb[i:i + 8] for i in range(0, len(d2map.copy_counts_fb), 8)]
     entries = []
-    for e in entries_hex:
+    for e in entries_fb:
         entries.append(get_header(e, CountEntry()))
     for entry in entries:
         d2map.copy_counts.append({'UID': d2map.model_refs[entry.ModelRef], 'Count': entry.Count})
@@ -147,7 +146,7 @@ def get_transforms_array(model_refs, copy_counts, rotations, location, map_scale
     return transforms_array
 
 
-def compute_coords(d2map: Map, unreal, shaders):
+def compute_coords(d2map: Map, unreal, shaders, apply_textures):
     nums = 0
 
     d2map.fbx_model.scene.GetRootNode().SetGeometricRotation(fbx.FbxNode.eSourcePivot, fbx.FbxVector4(-90, -25, -80))
@@ -170,29 +169,11 @@ def compute_coords(d2map: Map, unreal, shaders):
         max_vert_used = 0
         for j, model in enumerate(model_file.models):
             for k, submesh in enumerate(model.submeshes):
+                mesh = None
                 if submesh.type == 769 or submesh.type == 770 or submesh.type == 778 or submesh.type == 'New':
                     for cc in range(copy_count):
-                        name = f'{model_ref}_{cc}_{j}_{k}'
-                        if cc == 0:
-                            submesh.faces, max_vert_used = met.adjust_faces_data(submesh.faces, max_vert_used)
-                            submesh.faces = met.shift_faces_down(submesh.faces)
-                            mesh = create_mesh(d2map, submesh, name)
-                        node = fbx.FbxNode.Create(d2map.fbx_model.scene, name)
-                        node.SetRotationActive(True)
-                        rot = d2map.rotations[nums+cc]
-                        node.SetNodeAttribute(mesh)
-                        loc_rot = d2map.locations[nums+cc]
-                        r = scipy.spatial.transform.Rotation.from_quat(rot).as_euler('xyz', degrees=True)
-                        node.SetGeometricRotation(fbx.FbxNode.eSourcePivot, fbx.FbxVector4(-r[0]-90, r[1]-180, r[2]))
-                        node.SetGeometricTranslation(fbx.FbxNode.eSourcePivot, fbx.FbxVector4(loc_rot[0]*100, loc_rot[1]*100, loc_rot[2]*100))
-                        node.SetGeometricScaling(fbx.FbxNode.eSourcePivot, fbx.FbxVector4(d2map.scales[nums+cc]*100, d2map.scales[nums+cc]*100, d2map.scales[nums+cc]*100))
+                        mesh, max_vert_used = add_model_to_fbx_map(f'{model_ref}_{cc}_{j}_{k}', submesh, model_file, cc, max_vert_used, d2map, nums, mesh, unreal, apply_textures, shaders)
 
-                        if unreal:
-                            d2map.fbx_model.scene.GetRootNode().AddChild(node)
-                        else:
-                            # Lcl seems to be the only thing that actually works around here
-                            node.LclRotation.Set(fbx.FbxDouble3(-90, 180, 0))
-                            d2map.fbx_model.scene.GetRootNode().AddChild(node)
         nums += copy_count
 
 
@@ -235,22 +216,69 @@ def get_shader_info(d2map: Map):
         if material.name == '0222-0CAF':
             print('')
         cbuffer_offsets, texture_offset = met.get_mat_tables(material)
-        textures = met.get_material_textures(material, texture_offset, custom_dir=f'I:/maps/{d2map.pkg_name}_fbx/textures/')
+        textures = met.get_material_textures(material, texture_offset, hash64_table, all_file_info, custom_dir=f'I:/maps/{d2map.pkg_name}_fbx/textures/')
         met.get_shader_file(material, textures, cbuffer_offsets, all_file_info, custom_dir=f'I:/maps/{d2map.pkg_name}_fbx/shaders/')
 
 
-def add_model_to_fbx_map(d2map: Map, model_file: met.ModelFile, submesh: met.Submesh, name, shaders):
-    node, mesh = create_mesh(d2map, submesh, name)
-    # met.get_submesh_textures(model_file, submesh, custom_dir=f'C:/d2_maps/{d2map.pkg_name}_fbx/textures/')
-    if not mesh.GetLayer(0):
-        mesh.CreateLayer()
-    layer = mesh.GetLayer(0)
-    if shaders:
-        apply_shader(d2map, submesh, node)
-    # apply_diffuse(d2map, submesh, node)
-    create_uv(mesh, name, submesh, layer)
+def add_model_to_fbx_map(name, submesh, model_file, cc, max_vert_used, d2map, nums, mesh, unreal, apply_textures, shaders):
+    if cc == 0:
+        submesh.faces, max_vert_used = met.adjust_faces_data(submesh.faces, max_vert_used)
+        submesh.faces = met.shift_faces_down(submesh.faces)
+        mesh = create_mesh(d2map, submesh, name)
+
+        if not mesh.GetLayer(0):
+            mesh.CreateLayer()
+        layer = mesh.GetLayer(0)
+
+        create_uv(mesh, name, submesh, layer)
+
+    node = fbx.FbxNode.Create(d2map.fbx_model.scene, name)
+    node.SetRotationActive(True)
+    rot = d2map.rotations[nums + cc]
+    node.SetNodeAttribute(mesh)
+    loc_rot = d2map.locations[nums + cc]
+    r = scipy.spatial.transform.Rotation.from_quat(rot).as_euler('xyz', degrees=True)
+    node.SetGeometricRotation(fbx.FbxNode.eSourcePivot, fbx.FbxVector4(-r[0] - 90, r[1] - 180, r[2]))
+    node.SetGeometricTranslation(fbx.FbxNode.eSourcePivot,
+                                 fbx.FbxVector4(loc_rot[0] * 100, loc_rot[1] * 100, loc_rot[2] * 100))
+    node.SetGeometricScaling(fbx.FbxNode.eSourcePivot,
+                             fbx.FbxVector4(d2map.scales[nums + cc] * 100, d2map.scales[nums + cc] * 100,
+                                            d2map.scales[nums + cc] * 100))
+
     node.SetShadingMode(fbx.FbxNode.eTextureShading)
-    d2map.fbx_model.scene.GetRootNode().AddChild(node)
+
+    if submesh.material:
+        if apply_textures or shaders:
+            met.get_submesh_textures(model_file, submesh, hash64_table, all_file_info, custom_dir=f'I:/maps/{d2map.pkg_name}_fbx/textures/')
+
+        if apply_textures and shaders:
+            raise Exception('Cannot apply textures AND use shaders.')
+        elif apply_textures and not shaders:
+            apply_diffuse(d2map, submesh, node)
+        elif shaders:
+            apply_shader(d2map, submesh, node)
+
+    if unreal:
+        d2map.fbx_model.scene.GetRootNode().AddChild(node)
+    else:
+        # Lcl seems to be the only thing that actually works around here
+        node.LclRotation.Set(fbx.FbxDouble3(-90, 180, 0))
+        d2map.fbx_model.scene.GetRootNode().AddChild(node)
+
+    return mesh, max_vert_used
+
+# def add_model_to_fbx_map(d2map: Map, model_file: met.ModelFile, submesh: met.Submesh, name, shaders):
+#     node, mesh = create_mesh(d2map, submesh, name)
+#     # met.get_submesh_textures(model_file, submesh, custom_dir=f'C:/d2_maps/{d2map.pkg_name}_fbx/textures/')
+#     if not mesh.GetLayer(0):
+#         mesh.CreateLayer()
+#     layer = mesh.GetLayer(0)
+#     if shaders:
+#         apply_shader(d2map, submesh, node)
+#     # apply_diffuse(d2map, submesh, node)
+#     create_uv(mesh, name, submesh, layer)
+#     node.SetShadingMode(fbx.FbxNode.eTextureShading)
+#     d2map.fbx_model.scene.GetRootNode().AddChild(node)
 
 
 def apply_shader(d2map: Map, submesh: met.Submesh, node):
@@ -301,6 +329,7 @@ def apply_diffuse(d2map, submesh, node):
     lTexPath = f'I:/maps/{d2map.pkg_name}_fbx/textures/{submesh.diffuse}.png'
     # print('tex path', f'C:/d2_maps/{folder_name}_fbx/textures/{tex_name}.png')
     gTexture.SetFileName(lTexPath)
+    gTexture.SetRelativeFileName(lTexPath)
     gTexture.SetTextureUse(fbx.FbxFileTexture.eStandard)
     gTexture.SetMappingType(fbx.FbxFileTexture.eUV)
     gTexture.SetMaterialUse(fbx.FbxFileTexture.eModelMaterial)
@@ -331,7 +360,7 @@ def write_fbx(d2map: Map):
     print(f'Wrote fbx of {d2map.name}')
 
 
-def unpack_folder(pkg_name, unreal, shaders):
+def unpack_folder(pkg_name, unreal, shaders, apply_textures):
     entries_refid = {x: y for x, y in pkg_db.get_entries_from_table(pkg_name, 'FileName, RefID') if y == '0x13AD'}
     entries_refpkg = {x: y for x, y in pkg_db.get_entries_from_table(pkg_name, 'FileName, RefPKG') if y == '0x0004'}
     entries_size = {x: y for x, y in pkg_db.get_entries_from_table(pkg_name, 'FileName, FileSizeB')}
@@ -341,16 +370,24 @@ def unpack_folder(pkg_name, unreal, shaders):
             # a = [x.split('.')[0] for x in os.listdir('C:\d2_maps/orphaned_0932_fbx/')]
             # if file_name in [x.split('.')[0] for x in os.listdir(f'C:\d2_maps/{pkg_name}_fbx/')]:
             #     continue
-            if '0A37' not in file_name:
+            if '0C7C' not in file_name:
                 continue
             print(f'Unpacking {file_name}')
-            unpack_map(file_name, pkg_name, unreal, shaders)
+            unpack_map(file_name, pkg_name, unreal, shaders, apply_textures)
 
 
 if __name__ == '__main__':
-    import os
+    version = '3_0_2_0'
     # WARNING THIS CURRENTLY DOES NOT OVERWRITE SHADER FILES THAT ARE ALREADY WRITTEN
-    pkg_db.start_db_connection()
+    pkg_db.start_db_connection(f'I:/d2_pkg_db/hash64/{version}.db')
+    hash64_table = {x: y for x, y in pkg_db.get_entries_from_table('Everything', 'Hash64, Reference')}
+
+    pkg_db.start_db_connection(f'I:/d2_pkg_db/locations/{version}.db')
+    loc_table = {y: x for x, y in pkg_db.get_entries_from_table('Everything', 'Hash, String')}
+
+    pkg_db.start_db_connection(f'I:/d2_pkg_db/{version}.db')
     all_file_info = {x[0]: dict(zip(['RefID', 'RefPKG', 'FileType'], x[1:])) for x in
                      pkg_db.get_entries_from_table('Everything', 'FileName, RefID, RefPKG, FileType')}
-    unpack_folder('city_tower_d2_01ad', unreal=False, shaders=False)
+
+    unpack_folder('europa_0232', unreal=True, shaders=True, apply_textures=False)
+    # unpack_location('')

@@ -107,7 +107,7 @@ class Model:
 
         Model.manager.GetIOSettings().SetBoolProp(fbx.EXP_FBX_MATERIAL, True)
         Model.manager.GetIOSettings().SetBoolProp(fbx.EXP_FBX_TEXTURE, True)
-        Model.manager.GetIOSettings().SetBoolProp(fbx.EXP_FBX_EMBEDDED, True)
+        Model.manager.GetIOSettings().SetBoolProp(fbx.EXP_FBX_EMBEDDED, False)
         Model.manager.GetIOSettings().SetBoolProp(fbx.EXP_FBX_SHAPE, True)
         Model.manager.GetIOSettings().SetBoolProp(fbx.EXP_FBX_GOBO, False)
         Model.manager.GetIOSettings().SetBoolProp(fbx.EXP_FBX_ANIMATION, False)

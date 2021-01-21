@@ -6,7 +6,8 @@ import os.path
 import fbx
 import pyfbx as pfb
 import gf
-import image_decoder_new as imager
+import image_decoder_new as imager  # Unreal only?
+import image_extractor as imager  # Blender
 import get_shader as shaders
 
 
@@ -32,27 +33,22 @@ class File:
         self.name = name
         self.uid = uid
         self.pkg_name = pkg_name
-        self.fhex = None
+        self.fb = None
 
     def get_file_from_uid(self):
         self.name = gf.get_file_from_hash(self.uid)
-        return self.pkg_name
+        return self.name
 
     def get_uid_from_file(self):
         self.uid = gf.get_hash_from_file(self.name)
-        return self.pkg_name
+        return self.uid
 
     def get_pkg_name(self):
         self.pkg_name = gf.get_pkg_name(self.name)
         return self.pkg_name
 
-    def get_hex_data(self):
-        if not self.pkg_name:
-            self.get_pkg_name()
-        if not self.name:
-            self.get_file_from_uid()
-        self.fhex = gf.get_hex_data(f'I:/d2_output_3_0_1_0/{self.pkg_name}/{self.name}.bin')
-        return self.fhex
+    def get_fb(self):
+        self.fb = open(f'I:/d2_output_3_0_2_0/{self.pkg_name}/{self.name}.bin', 'rb').read()
 
 
 class ModelFile(File):
@@ -62,8 +58,8 @@ class ModelFile(File):
         self.material_files = []
         self.materials = {}
         self.model_data_file = File(name=self.get_model_data_file())
-        self.model_file_hex = ''
-        self.model_data_hex = ''
+        self.model_file_fb = b''
+        self.model_data_fb = b''
         self.new_type = None
 
     def get_model_data_file(self):
@@ -72,9 +68,9 @@ class ModelFile(File):
         if not pkg_name:
             return None
             # raise RuntimeError('Invalid model file given')
-        self.model_file_hex = gf.get_hex_data(f'I:/d2_output_3_0_1_0/{pkg_name}/{self.name}.bin')
-        model_data_hash = self.model_file_hex[16:24]
-        return gf.get_file_from_hash(model_data_hash)
+        self.model_file_fb = open(f'I:/d2_output_3_0_2_0/{pkg_name}/{self.name}.bin', 'rb').read()
+        model_data_hash = self.model_file_fb[8:12]
+        return gf.get_file_from_hash(model_data_hash.hex())
 
 
 class Model:
@@ -116,31 +112,29 @@ class HeaderFile(File):
             if not self.name:
                 self.name = gf.get_file_from_hash(self.uid)
             pkg_name = gf.get_pkg_name(self.name)
-            header_hex = gf.get_hex_data(f'I:/d2_output_3_0_1_0/{pkg_name}/{self.name}.bin')
-            self.header = get_header(header_hex, Stride12Header())
+            header_fb = open(f'I:/d2_output_3_0_2_0/{pkg_name}/{self.name}.bin', 'rb').read()
+            self.header = get_header(header_fb, Stride12Header())
             return self.header
 
 
-def get_header(file_hex, header):
+def get_header(fb, header):
     # The header data is 0x16F bytes long, so we need to x2 as python reads each nibble not each byte
 
     for f in fields(header):
         if f.type == np.uint32:
-            flipped = "".join(gf.get_flipped_hex(file_hex, 8))
-            value = np.uint32(int(flipped, 16))
+            value = gf.get_uint32(fb, 0)
             setattr(header, f.name, value)
-            file_hex = file_hex[8:]
+            fb = fb[4:]
         elif f.type == np.uint16:
-            flipped = "".join(gf.get_flipped_hex(file_hex, 4))
-            value = np.uint16(int(flipped, 16))
+            value = gf.get_uint16(fb, 0)
             setattr(header, f.name, value)
-            file_hex = file_hex[4:]
+            fb = fb[2:]
     return header
 
 
 def get_model(model_file_hash):
     print(f'Getting model {model_file_hash}.')
-    pkg_db.start_db_connection()
+    # pkg_db.start_db_connection()
     model_file = ModelFile(model_file_hash)
     model_file.get_model_data_file()
     get_model_data(model_file, all_file_info)
@@ -168,7 +162,7 @@ def get_model_data(model_file: ModelFile, all_file_info):
             coords = get_verts_data(model.extra_verts_file, all_file_info, is_uv=True)
             model.uv_verts = coords[0]
             model.norm_verts = coords[1]
-            # model.uv_verts = scale_and_repos_uv_verts(model.uv_verts, model_file)
+            model.uv_verts = scale_and_repos_uv_verts(model.uv_verts, model_file)
         model.faces = get_faces_data(model.faces_file, all_file_info)
     return True
 
@@ -179,10 +173,10 @@ def get_model_files(model_file: ModelFile):
         print('NEW TYPEa')
         return
     model_file.model_data_file.get_pkg_name()
-    model_file.model_data_hex = gf.get_hex_data(f'I:/d2_output_3_0_1_0/{model_file.model_data_file.pkg_name}/{model_file.model_data_file.name}.bin')
-    split_hex = model_file.model_data_hex.split('B89F8080')[-1]
-    model_count = int(gf.get_flipped_hex(split_hex[:4], 4), 16)
-    relevant_hex = split_hex[32:]
+    model_file.model_data_fb = open(f'I:/d2_output_3_0_2_0/{model_file.model_data_file.pkg_name}/{model_file.model_data_file.name}.bin', 'rb').read()
+    split_fb = model_file.model_data_fb.split(b'\xB8\x9F\x80\x80')[-1]
+    model_count = gf.get_uint16(split_fb, 0)
+    relevant_fb = split_fb[16:]
 
     models = []
     for i in range(model_count):
@@ -193,35 +187,35 @@ def get_model_files(model_file: ModelFile):
         #     print('NEW TYPEb')
         #     return
         # Some normal statics also include this table???
-        if '2F6D8080' in model_file.model_file_hex and '14008080' not in model_file.model_file_hex:
+        if b'\x2F\x6D\x80\x80' in model_file.model_file_fb and b'\x14\x00\x80\x80' not in model_file.model_file_fb:
             model_file.new_type = True
             # Pretty sure this table only holds a single model file, so need to break after this.
             # This table is more complicated (look at onenote) but this is all I think I need for it to work
             print('New static type')
-            offset = model_file.model_file_hex.find('2F6D8080')+16
+            offset = model_file.model_file_fb.find(b'\x2F\x6D\x80\x80')+8
             if offset == -1:
                 raise Exception('BROKEN NEW TYPE')
-            count = int(gf.get_flipped_hex(model_file.model_file_hex[offset+8:offset+16], 8), 16)  # I need count here as I think some files can have four
+            count = gf.get_uint32(model_file.model_file_fb, 4)  # I need count here as I think some files can have four
             if count != 3:
-                print(f'Count != 3 (== {count}')
-            faces_hash = gf.get_flipped_hex(model_file.model_file_hex[offset+16:offset+24], 8)
-            pos_verts_file = gf.get_flipped_hex(model_file.model_file_hex[offset+24:offset+32], 8)
-            uv_verts_file = gf.get_flipped_hex(model_file.model_file_hex[offset+32:offset+40], 8)
+                print(f'Count != 3 (== {count})')
+            faces_hash = model_file.model_file_fb[offset+8:offset+12]
+            pos_verts_file = model_file.model_file_fb[offset+12:offset+16]
+            uv_verts_file = model_file.model_file_fb[offset+16:offset+20]
             if pos_verts_file == '' or faces_hash == '':
                 return
 
         else:
             # Normal static type
-            faces_hash = gf.get_flipped_hex(relevant_hex[32 * i:32 * i + 8], 8)
-            pos_verts_file = gf.get_flipped_hex(relevant_hex[32 * i + 8:32 * i + 16], 8)
-            uv_verts_file = gf.get_flipped_hex(relevant_hex[32 * i + 16:32 * i + 24], 8)
+            faces_hash = relevant_fb[16 * i:16 * i + 4]
+            pos_verts_file = relevant_fb[16 * i + 4:16 * i + 8]
+            uv_verts_file = relevant_fb[16 * i + 8:16 * i + 12]
             if pos_verts_file == '' or faces_hash == '':
                 return
         for j, hsh in enumerate([faces_hash, pos_verts_file, uv_verts_file]):
             hf = HeaderFile()
-            hf.uid = gf.get_flipped_hex(hsh, 8)
-            hf.name = gf.get_file_from_hash(hf.uid)
-            hf.pkg_name = gf.get_pkg_name(hf.name)
+            hf.uid = hsh.hex()
+            hf.name = hf.get_file_from_uid()
+            hf.pkg_name = hf.get_pkg_name()
             if j == 0:
                 model.faces_file = hf
             elif j == 1:
@@ -245,10 +239,9 @@ def get_submeshes(model_file: ModelFile):
         # Assuming we only want a single submesh as of now
         submesh = Submesh()
         model = model_file.models[0]
-        offset = model_file.model_file_hex.find('2F6D8080')+16
-        a = model_file.model_file_hex[offset+48:offset+56]
-        faces_offset = int(gf.get_flipped_hex(model_file.model_file_hex[offset+48:offset+56], 8), 16)
-        faces_length = int(gf.get_flipped_hex(model_file.model_file_hex[offset+56:offset+64], 8), 16)
+        offset = model_file.model_file_fb.find(b'\x2F\x6D\x80\x80')+8
+        faces_offset = gf.get_uint32(model_file.model_file_fb, offset+24)
+        faces_length = gf.get_uint32(model_file.model_file_fb, offset+28)
         submesh.faces = model.faces[int(faces_offset / 3):int((faces_offset + faces_length) / 3)]
         submesh.pos_verts = trim_verts_data(model.pos_verts, submesh.faces)
         submesh.uv_verts = trim_verts_data(model.uv_verts, submesh.faces)
@@ -256,16 +249,16 @@ def get_submeshes(model_file: ModelFile):
         submesh.type = 'New'
         model.submeshes.append(submesh)
     else:
-        unk_entries_count = int(gf.get_flipped_hex(model_file.model_data_hex[128*2:128*2 + 8], 4), 16)
+        unk_entries_count = gf.get_uint32(model_file.model_file_fb, 128)
         unk_entries_offset = 144
 
         end_offset = unk_entries_offset + unk_entries_count * 6
-        end_place = int(model_file.model_data_hex[end_offset*2:].find('B89F8080')/2)
-        submesh_entries_count = int(gf.get_flipped_hex(model_file.model_data_hex[(end_offset + end_place + 4)*2:(end_offset + end_place + 6)*2], 4), 16)
+        end_place = model_file.model_data_fb[end_offset:].find(b'\xB8\x9F\x80\x80')
+        submesh_entries_count = gf.get_uint16(model_file.model_data_fb, end_offset + end_place + 4)
         submesh_entries_offset = end_offset + end_place + 20
         submesh_entries_length = submesh_entries_count * 12
-        submesh_entries_hex = model_file.model_data_hex[submesh_entries_offset*2:submesh_entries_offset*2 + submesh_entries_length*2]
-        submesh_entries = [submesh_entries_hex[i:i+24] for i in range(0, len(submesh_entries_hex), 24)]
+        submesh_entries_fb = model_file.model_data_fb[submesh_entries_offset:submesh_entries_offset + submesh_entries_length]
+        submesh_entries = [submesh_entries_fb[i:i+12] for i in range(0, len(submesh_entries_fb), 12)]
 
         actual_submeshes = []
         for e in submesh_entries:
@@ -289,14 +282,14 @@ def get_submeshes(model_file: ModelFile):
 
 
 def get_materials(model_file: ModelFile):
-    texture_count = int(gf.get_flipped_hex(model_file.model_data_hex[128*2:128*2+8], 8), 16)
-    texture_id_entries = [[int(gf.get_flipped_hex(model_file.model_data_hex[i:i+4], 4), 16), model_file.model_data_hex[i+4:i+6], model_file.model_data_hex[i+8:i+12]] for i in range(144*2, 144*2+texture_count*12, 12)]
-    texture_entries = [model_file.model_file_hex[i:i+8] for i in range(144*2, 144*2+texture_count*8, 8)]
+    texture_count = gf.get_uint32(model_file.model_data_fb, 128)
+    texture_id_entries = [[gf.get_uint16(model_file.model_data_fb, i), model_file.model_data_fb[i+2:i+3], model_file.model_data_fb[i+4:i+6]] for i in range(144, 144+texture_count*6, 6)]
+    texture_entries = [model_file.model_file_fb[i:i+4] for i in range(144, 144+texture_count*4, 4)]
     relevant_textures = {}
     for i, entry in enumerate(texture_id_entries):
         # 0000 is LOD0, 0003 is prob LOD1, 000C LOD2
-        if entry[1] == '00':
-            relevant_textures[entry[0]] = gf.get_file_from_hash(texture_entries[i])
+        if entry[1] == b'\x00':
+            relevant_textures[entry[0]] = gf.get_file_from_hash(texture_entries[i].hex())
     return relevant_textures
 
 
@@ -330,12 +323,12 @@ def adjust_faces_data(faces_data, max_vert_used):
 
 
 def scale_and_repos_pos_verts(verts_data, model_file):
-    scale = struct.unpack('f', bytes.fromhex(model_file.model_data_hex[184:184 + 8]))[0]
+    scale = struct.unpack('f', model_file.model_data_fb[92:92 + 4])[0]
     for i in range(len(verts_data)):
         for j in range(3):
             verts_data[i][j] *= scale
 
-    position_shift = [struct.unpack('f', bytes.fromhex(model_file.model_data_hex[160 + 8 * i:160 + 8 * (i + 1)]))[0] for i in range(3)]
+    position_shift = [struct.unpack('f', model_file.model_data_fb[80 + 4 * i:80 + 4 * (i + 1)])[0] for i in range(3)]
     for i in range(3):
         for j in range(len(verts_data)):
             verts_data[j][i] -= (scale - position_shift[i])
@@ -344,8 +337,8 @@ def scale_and_repos_pos_verts(verts_data, model_file):
 
 def scale_and_repos_uv_verts(verts_data, model_file):
     # return verts_data
-    scales = [struct.unpack('f', bytes.fromhex(model_file.model_file_hex[0x70*2+i*8:0x70*2+(i+1)*8]))[0] for i in range(2)]
-    position_shifts = [struct.unpack('f', bytes.fromhex(model_file.model_file_hex[0x78*2+i*8:0x78*2+(i+1)*8]))[0] for i in range(2)]
+    scales = [struct.unpack('f', model_file.model_data_fb[0x60+i*4:0x60+(i+1)*4])[0] for i in range(2)]
+    position_shifts = [struct.unpack('f', model_file.model_data_fb[0x68+i*4:0x68+(i+1)*4])[0] for i in range(2)]
     for i in range(len(verts_data)):
         verts_data[i][0] *= scales[0]
         verts_data[i][1] *= -scales[1]
@@ -363,13 +356,14 @@ def scale_and_repos_uv_verts(verts_data, model_file):
 
 
 def get_faces_data(faces_file, all_file_info):
+    faces_file.get_file_from_uid()
     ref_file = f"{all_file_info[faces_file.name]['RefPKG'][2:]}-{all_file_info[faces_file.name]['RefID'][2:]}"
     ref_pkg_name = gf.get_pkg_name(ref_file)
     ref_file_type = all_file_info[ref_file]['FileType']
     faces = []
     if ref_file_type == "Faces Data":
-        faces_hex = gf.get_hex_data(f'I:/d2_output_3_0_1_0/{ref_pkg_name}/{ref_file}.bin')
-        int_faces_data = [int(gf.get_flipped_hex(faces_hex[i:i+4], 4), 16)+1 for i in range(0, len(faces_hex), 4)]
+        faces_fb = open(f'I:/d2_output_3_0_2_0/{ref_pkg_name}/{ref_file}.bin', 'rb').read()
+        int_faces_data = [gf.get_uint16(faces_fb, i)+1 for i in range(0, len(faces_fb), 2)]
         for i in range(0, len(int_faces_data), 3):
             face = []
             for j in range(3):
@@ -381,17 +375,10 @@ def get_faces_data(faces_file, all_file_info):
         return None
 
 
-def get_float16(hex_data, j):
-    flt = get_signed_int(gf.get_flipped_hex(hex_data[j * 4:j * 4 + 4], 4), 16)
+def get_float16(fb, j):
+    flt = int.from_bytes(fb[j * 2:j * 2 + 2], 'little', signed=True)
     flt = 1 + flt / (2 ** 15 - 1)
     return flt
-
-
-def get_signed_int(hexstr, bits):
-    value = int(hexstr, 16)
-    if value & (1 << (bits-1)):
-        value -= 1 << bits
-    return value
 
 
 def get_verts_data(verts_file, all_file_info, is_uv):
@@ -399,19 +386,19 @@ def get_verts_data(verts_file, all_file_info, is_uv):
     Stride length 48 is a dynamic and physics-enabled object.
     """
     # TODO deal with this
-    pkg_name = verts_file.pkg_name
+    pkg_name = verts_file.get_pkg_name()
     if not pkg_name:
-        return None
+        raise Exception('No pkg name')
     ref_file = f"{all_file_info[verts_file.name]['RefPKG'][2:]}-{all_file_info[verts_file.name]['RefID'][2:]}"
     ref_pkg_name = gf.get_pkg_name(ref_file)
     ref_file_type = all_file_info[ref_file]['FileType']
     if ref_file_type == "Vertex Data":
         stride_header = verts_file.header
 
-        stride_hex = gf.get_hex_data(f'I:/d2_output_3_0_1_0/{ref_pkg_name}/{ref_file}.bin')
+        stride_fb = open(f'I:/d2_output_3_0_2_0/{ref_pkg_name}/{ref_file}.bin', 'rb').read()
 
-        hex_data_split = [stride_hex[i:i + stride_header.StrideLength * 2] for i in
-                          range(0, len(stride_hex), stride_header.StrideLength * 2)]
+        fb_data_split = [stride_fb[i:i + stride_header.StrideLength] for i in
+                          range(0, len(stride_fb), stride_header.StrideLength)]
     else:
         print(f'Verts: Incorrect type of file {ref_file_type} for ref file {ref_file} verts file {verts_file}')
         return None
@@ -421,54 +408,54 @@ def get_verts_data(verts_file, all_file_info, is_uv):
         """
         UV info for dynamic, physics-based objects.
         """
-        coords = get_coords_4(hex_data_split)
+        coords = get_coords_4(fb_data_split)
     elif stride_header.StrideLength == 8:
         """
         Coord info for static and dynamic, non-physics objects.
         ? info for dynamic, physics-based objects.
         Can also be uv for some reason
         """
-        coords = get_coords_8(hex_data_split, is_uv)
+        coords = get_coords_8(fb_data_split, is_uv)
     elif stride_header.StrideLength == 12:
         """
         Coord info takes up same 8 stride, also 2 extra bits.
         Also UV sometimes? 2 extra bits will be for UV
         """
         # TODO ADD PROPER SUPPORT
-        coords = get_coords_12(hex_data_split, is_uv)
+        coords = get_coords_12(fb_data_split, is_uv)
     elif stride_header.StrideLength == 16:
         """
         UV
         """
-        coords = get_coords_16(hex_data_split, is_uv)
+        coords = get_coords_16(fb_data_split, is_uv)
     elif stride_header.StrideLength == 20:
         """
         UV info for static and dynamic, non-physics objects.
         """
-        coords = get_coords_20(hex_data_split)
+        coords = get_coords_20(fb_data_split)
     elif stride_header.StrideLength == 24:
         """
         UV info for dynamic, non-physics objects gear?
         """
-        coords = get_coords_24(hex_data_split)
+        coords = get_coords_24(fb_data_split)
     elif stride_header.StrideLength == 28:
         """
         Coord info takes up same 8 stride, idk about other stuff
         """
         # TODO ADD PROPER SUPPORT
-        coords = get_coords_8(hex_data_split)
+        coords = get_coords_8(fb_data_split)
     elif stride_header.StrideLength == 32:
         """
         Coord info takes up same 8 stride, idk about other stuff
         """
         # TODO ADD PROPER SUPPORT
-        coords = get_coords_8(hex_data_split)
+        coords = get_coords_8(fb_data_split)
     elif stride_header.StrideLength == 48:
         """
         Coord info for dynamic, physics-based objects.
         """
         # print('Stride 48')
-        coords = get_coords_48(hex_data_split)
+        coords = get_coords_48(fb_data_split)
     else:
         print(f'Need to add support for stride length {stride_header.StrideLength}, file is {verts_file.name} ref {ref_file}')
         quit()
@@ -476,53 +463,53 @@ def get_verts_data(verts_file, all_file_info, is_uv):
     return coords
 
 
-def get_coords_4(hex_data_split):
+def get_coords_4(fb_data_split):
     coords = []
-    for hex_data in hex_data_split:
+    for fb_data in fb_data_split:
         coord = []
         for j in range(2):
-            flt = get_float16(hex_data, j)
+            flt = get_float16(fb_data, j)
             coord.append(flt)
         coords.append(coord)
     return [coords, []]
 
 
-def get_coords_8(hex_data_split, is_uv=False):
+def get_coords_8(fb_data_split, is_uv=False):
     if is_uv:
         uvs = []
-        for hex_data in hex_data_split:
+        for fb_data in fb_data_split:
             uv = []
             for j in range(4):
-                flt = get_float16(hex_data, j)
+                flt = get_float16(fb_data, j)
                 if j % 2 == 0:
                     uv.append(flt)
             uvs.append(uv)
         return [uvs, []]
     else:
         coords = []
-        for hex_data in hex_data_split:
+        for fb_data in fb_data_split:
             coord = []
             for j in range(3):
-                flt = get_float16(hex_data, j)
+                flt = get_float16(fb_data, j)
                 coord.append(flt)
             coords.append(coord)
         return coords
 
 
-def get_coords_12(hex_data_split, is_uv):
+def get_coords_12(fb_data_split, is_uv):
     uvs = []
     coords = []
-    for hex_data in hex_data_split:
+    for fb_data in fb_data_split:
         if is_uv:
             uv = []
             for j in range(0, 2):
-                flt = get_float16(hex_data, j)
+                flt = get_float16(fb_data, j)
                 uv.append(flt)
             uvs.append(uv)
         else:
             coord = []
             for j in range(3):
-                flt = get_float16(hex_data, j)
+                flt = get_float16(fb_data, j)
                 coord.append(flt)
             coords.append(coord)
     if is_uv:
@@ -531,20 +518,20 @@ def get_coords_12(hex_data_split, is_uv):
         return coords
 
 
-def get_coords_16(hex_data_split, is_uv):
+def get_coords_16(fb_data_split, is_uv):
     uvs = []
     coords = []
-    for hex_data in hex_data_split:
+    for fb_data in fb_data_split:
         if is_uv:
             uv = []
             for j in range(2):
-                flt = get_float16(hex_data, j)
+                flt = get_float16(fb_data, j)
                 uv.append(flt)
             uvs.append(uv)
         else:
             coord = []
             for j in range(3):
-                flt = get_float16(hex_data, j)
+                flt = get_float16(fb_data, j)
                 coord.append(flt)
             coords.append(coord)
     if is_uv:
@@ -553,40 +540,40 @@ def get_coords_16(hex_data_split, is_uv):
         return coords
 
 
-def get_coords_20(hex_data_split):
+def get_coords_20(fb_data_split):
     uvs = []
     normals = []
-    for hex_data in hex_data_split:
+    for fb_data in fb_data_split:
         uv = []
         norm = []
         for j in range(2):
-            flt = get_float16(hex_data, j)
+            flt = get_float16(fb_data, j)
             uv.append(flt)
         uvs.append(uv)
         for j in range(2, 5):
-            flt = get_float16(hex_data, j)-1
+            flt = get_float16(fb_data, j)-1
             norm.append(flt)
         normals.append(norm)
     return [uvs, normals]
 
 
-def get_coords_24(hex_data_split):
+def get_coords_24(fb_data_split):
     coords = []
-    for hex_data in hex_data_split:
+    for fb_data in fb_data_split:
         coord = []
         for j in range(2):
-            flt = get_float16(hex_data, j)
+            flt = get_float16(fb_data, j)
             coord.append(flt)
         coords.append(coord)
     return [coords, []]
 
 
-def get_coords_48(hex_data_split):
+def get_coords_48(fb_data_split):
     coords = []
-    for hex_data in hex_data_split:
+    for fb_data in fb_data_split:
         coord = []
         for j in range(3):
-            flt = struct.unpack('f', bytes.fromhex(hex_data[j * 8:j * 8 + 8]))[0]
+            flt = struct.unpack('f', bytes.fromhex(fb_data[j * 4:j * 4 + 4]))[0]
             coord.append(flt)
         coords.append(coord)
     return coords
@@ -606,8 +593,8 @@ def export_fbx(model_file: ModelFile, submesh: Submesh, name):
     model = pfb.Model()
     node, mesh = create_mesh(model, submesh.pos_verts, submesh.faces, name)
     # Disabled materials for now
-    if submesh.material and False:
-        # get_submesh_textures(model_file, submesh)
+    if submesh.material:
+        get_submesh_textures(model_file, submesh, hash64_table, all_file_info)
         # shaders.get_shader(model_file, submesh, all_file_info, name)
         apply_shader(model, model_file, submesh, node)
         print(f'submesh {name} has mat file {submesh.material.name} with textures {submesh.textures}')
@@ -616,7 +603,7 @@ def export_fbx(model_file: ModelFile, submesh: Submesh, name):
                 mesh.CreateLayer()
             layer = mesh.GetLayer(0)
 
-            # apply_diffuse(model, submesh.diffuse, f'C:/d2_model_temp/texture_models/{model_file.uid}/textures/{submesh.diffuse}.png', node)
+            # apply_diffuse(model, submesh.diffuse, f'I:/static_models/{model_file.uid}/textures/{submesh.diffuse}.png', node)
 
             create_uv(mesh, submesh.diffuse, submesh.uv_verts, layer)
             # set_normals(mesh, submesh.diffuse, submesh.norm_verts, layer)
@@ -624,8 +611,8 @@ def export_fbx(model_file: ModelFile, submesh: Submesh, name):
     model.scene.GetRootNode().AddChild(node)
 
     # Disabled shaders for now
-    if False:
-        get_shader_info(model_file)
+    # if True:
+    get_shader_info(model_file)
 
     model.export(save_path=f'I:/static_models/{model_file.uid}/{name}.fbx', ascii_format=False)
     print('Exported')
@@ -636,8 +623,8 @@ def get_shader_info(model_file):
         if material.name == '0222-0CAF':
             print('')
         cbuffer_offsets, texture_offset = get_mat_tables(material)
-        textures = get_material_textures(material, texture_offset, custom_dir=f'C:/d2_model_temp/texture_models/{model_file.uid}/textures/')
-        get_shader_file(material, textures, cbuffer_offsets, all_file_info, custom_dir=f'C:/d2_model_temp/texture_models/{model_file.uid}/shaders/')
+        textures = get_material_textures(material, texture_offset, hash64_table, all_file_info, custom_dir=f'I:/static_models/{model_file.uid}/textures/')
+        get_shader_file(material, textures, cbuffer_offsets, all_file_info, custom_dir=f'I:/static_models/{model_file.uid}/shaders/')
 
 
 def apply_shader(model, model_file, submesh: Submesh, node):
@@ -653,15 +640,16 @@ def apply_shader(model, model_file, submesh: Submesh, node):
     node.AddMaterial(lMaterial)
 
 
-def get_submesh_textures(model_file: ModelFile, submesh: Submesh, custom_dir=False):
-    submesh.material.get_hex_data()
-    offset = submesh.material.fhex.find('11728080')
-    count = int(gf.get_flipped_hex(submesh.material.fhex[offset-16:offset-8], 8), 16)
+def get_submesh_textures(model_file: ModelFile, submesh: Submesh, hash64_table, all_file_info, custom_dir=False):
+    submesh.material.get_pkg_name()
+    submesh.material.get_fb()
+    offset = submesh.material.fb.find(b'\xCF\x6D\x80\x80')
+    count = gf.get_uint32(submesh.material.fb, offset-8)
     # Arbritrary
     if count < 0 or count > 100:
         return
-    image_indices = [gf.get_file_from_hash(submesh.material.fhex[offset+16+8*(2*i):offset+16+8*(2*i)+8]) for i in range(count)]
-    images = [gf.get_file_from_hash(submesh.material.fhex[offset+16+8+8*(2*i):offset+16+8*(2*i)+16]) for i in range(count)]
+    # image_indices = [gf.get_file_from_hash(submesh.material.fhex[offset+16+8*(2*i):offset+16+8*(2*i)+8]) for i in range(count)]
+    images = [gf.get_file_from_hash(hash64_table[submesh.material.fb[offset+8+0x10+24*i:offset+8+0x10+24*i+8].hex().upper()]) for i in range(count)]
     # _, images = zip(*sorted(zip(image_indices, images)))
     if len(images) == 0:
         return
@@ -673,32 +661,33 @@ def get_submesh_textures(model_file: ModelFile, submesh: Submesh, custom_dir=Fal
             if not os.path.exists(f'{custom_dir}/{img}.png'):
                 if img == 'FBFF-1FFF':
                     continue
-                imager.get_image_from_file(f'I:/d2_output_3_0_1_0/{gf.get_pkg_name(img)}/{img}.bin', f'{custom_dir}/')
+                imager.get_image_from_file(f'I:/d2_output_3_0_2_0/{gf.get_pkg_name(img)}/{img}.bin', all_file_info, f'{custom_dir}/')
         else:
-            gf.mkdir(f'C:/d2_model_temp/texture_models/{model_file.uid}/textures/')
-            if not os.path.exists(f'C:/d2_model_temp/texture_models/{model_file.uid}/textures/{img}.png'):
-                imager.get_image_from_file(f'I:/d2_output_3_0_1_0/{gf.get_pkg_name(img)}/{img}.bin', f'C:/d2_model_temp/texture_models/{model_file.uid}/textures/')
+            gf.mkdir(f'I:/static_models/{model_file.uid}/textures/')
+            if not os.path.exists(f'I:/static_models/{model_file.uid}/textures/{img}.png'):
+                imager.get_image_from_file(f'I:/d2_output_3_0_2_0/{gf.get_pkg_name(img)}/{img}.bin', all_file_info, f'I:/static_models/{model_file.uid}/textures/')
 
 
 def get_mat_tables(material):
-    material.get_hex_data()
+    material.get_pkg_name()
+    material.get_fb()
     cbuffers = []
     textures = -1
 
-    texture_offset = 0x2D8*2
-    table_offset = texture_offset + int(gf.get_flipped_hex(material.fhex[texture_offset:texture_offset + 8], 8), 16) * 2
+    texture_offset = 0x2A8
+    table_offset = texture_offset + gf.get_uint32(material.fb, texture_offset)
     # table_count = int(gf.get_flipped_hex(material.fhex[table_offset:table_offset+8], 8), 16)
-    table_type = material.fhex[table_offset + 16:table_offset + 24]
-    if table_type == '11728080':
+    table_type = material.fb[table_offset + 8:table_offset + 12]
+    if table_type == b'\xCF\x6D\x80\x80':
         textures = table_offset
 
-    start_offset = 0x2F0*2
+    start_offset = 0x2C0
     for i in range(6):
-        current_offset = start_offset + 32*i
-        table_offset = current_offset + int(gf.get_flipped_hex(material.fhex[current_offset:current_offset+8], 8), 16)*2
+        current_offset = start_offset + 16*i
+        table_offset = current_offset + gf.get_uint32(material.fb, current_offset)
         # table_count = int(gf.get_flipped_hex(material.fhex[table_offset:table_offset+8], 8), 16)
-        table_type = material.fhex[table_offset+16:table_offset+24]
-        if table_type == '90008080':
+        table_type = material.fb[table_offset+8:table_offset+12]
+        if table_type == b'\x90\x00\x80\x80':
             cbuffers.append(table_offset)
 
     # if textures == -1:
@@ -707,17 +696,18 @@ def get_mat_tables(material):
     return cbuffers, textures
 
 
-def get_material_textures(material, texture_offset, custom_dir):
-    material.get_hex_data()
-    texture_offset += 16
+def get_material_textures(material, texture_offset, hash64_table, all_file_info, custom_dir):
+    material.get_pkg_name()
+    material.get_fb()
+    texture_offset += 8
     if texture_offset == 15:
         return []
-    count = int(gf.get_flipped_hex(material.fhex[texture_offset-16:texture_offset-8], 8), 16)
+    count = gf.get_uint32(material.fb, texture_offset-8)
     # Arbritrary
     if count < 0 or count > 100:
         return []
     # image_indices = [gf.get_file_from_hash(material.fhex[texture_offset+16+8*(2*i):texture_offset+16+8*(2*i)+8]) for i in range(count)]
-    images = [gf.get_file_from_hash(material.fhex[texture_offset+16+8+8*(2*i):texture_offset+16+8*(2*i)+16]) for i in range(count)]
+    images = [gf.get_file_from_hash(hash64_table[material.fb[texture_offset+8+0x10+24*i:texture_offset+8+0x10+24*i+8].hex().upper()]) for i in range(count)]
     if len(images) == 0:
         return []
     for img in images:
@@ -726,7 +716,7 @@ def get_material_textures(material, texture_offset, custom_dir):
             if not os.path.exists(f'{custom_dir}/{img}.png'):
                 if img == 'FBFF-1FFF':
                     continue
-                imager.get_image_from_file(f'I:/d2_output_3_0_1_0/{gf.get_pkg_name(img)}/{img}.bin', f'{custom_dir}/')
+                imager.get_image_from_file(f'I:/d2_output_3_0_2_0/{gf.get_pkg_name(img)}/{img}.bin', all_file_info, f'{custom_dir}/')
         # else:
         #     gf.mkdir(f'C:/d2_model_temp/texture_models/{model_file.uid}/textures/')
         #     if not os.path.exists(f'C:/d2_model_temp/texture_models/{model_file.uid}/textures/{img}.png'):
@@ -770,6 +760,7 @@ def apply_diffuse(fbx_map, tex_name, tex_path, node):
     lTexPath = tex_path
     # print('tex path', f'C:/d2_maps/{folder_name}_fbx/textures/{tex_name}.png')
     gTexture.SetFileName(lTexPath)
+    gTexture.SetRelativeFileName(lTexPath)
     gTexture.SetTextureUse(fbx.FbxFileTexture.eStandard)
     gTexture.SetMappingType(fbx.FbxFileTexture.eUV)
     gTexture.SetMaterialUse(fbx.FbxFileTexture.eModelMaterial)
@@ -803,8 +794,13 @@ def create_uv(mesh, name, uv_verts_data, layer):
 
 
 if __name__ == '__main__':
-    pkg_db.start_db_connection()
+    version = '3_0_2_0'
+
+    pkg_db.start_db_connection(f'I:/d2_pkg_db/{version}.db')
     all_file_info = {x[0]: dict(zip(['RefID', 'RefPKG', 'FileType'], x[1:])) for x in
                      pkg_db.get_entries_from_table('Everything', 'FileName, RefID, RefPKG, FileType')}
 
-    get_model('95E0D080')
+    pkg_db.start_db_connection(f'I:/d2_pkg_db/hash64/{version}.db')
+    hash64_table = {x: y for x, y in pkg_db.get_entries_from_table('Everything', 'Hash64, Reference')}
+
+    get_model('124CC680')

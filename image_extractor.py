@@ -16,18 +16,25 @@ has the actual image data which uses the header data to transcribe that data to 
 
 @dataclass
 class ImageHeader:
-    EntrySize: np.uint32 = np.uint32(0)  # 0
+    TargetSize: np.uint32 = np.uint32(0)  # 0
     TextureFormat: np.uint32 = np.uint32(0)  # 4
-    Field8: np.uint32 = np.uint32(0)
-    Cafe: np.uint16 = np.uint16(0)  # 0xCAFE
-    Width: np.uint16 = np.uint16(0)  # E
-    Height: np.uint16 = np.uint16(0)  # 10
-    Field12: np.uint16 = np.uint16(0)
-    Field14: np.uint32 = np.uint32(0)
-    Field18: np.uint32 = np.uint32(0)
-    Field1C: np.uint32 = np.uint32(0)
-    Field20: np.uint32 = np.uint32(0)
-    LargeTextureHash: np.uint32 = np.uint32(0)  # 24
+    Field8: np.uint32 = np.uint32(0)  # 8
+    FieldC:  np.uint32 = np.uint32(0)  # C
+    Field10: np.uint32 = np.uint32(0)  # 10
+    Field14: np.uint32 = np.uint32(0)  # 14
+    Field18: np.uint32 = np.uint32(0)  # 18
+    Field1C: np.uint32 = np.uint32(0)  # 1C
+    Cafe: np.uint16 = np.uint16(0)  # 20  0xCAFE
+    Width: np.uint16 = np.uint16(0)  # 22
+    Height: np.uint16 = np.uint16(0)  # 24
+    Field26: np.uint16 = np.uint16(0)
+    TA: np.uint16 = np.uint16(0)  # 28
+    Field2A: np.uint16 = np.uint16(0)
+    Field2C: np.uint32 = np.uint32(0)
+    Field30: np.uint32 = np.uint32(0)
+    Field34: np.uint32 = np.uint32(0)
+    Field38: np.uint32 = np.uint32(0)
+    LargeTextureHash: np.uint32 = np.uint32(0)  # 3C
     TextureFormatDefined: str = ''
 
 # This header includes the magic number, DDS header, and DXT10 DDS header
@@ -203,25 +210,45 @@ def get_header(file_hex):
     return img_header
 
 
-def get_image_from_file(file_path, save_path=None):
-    pkg_db.start_db_connection()
+def define_texture_format(texture_format):
+    if DXGI_FORMAT[texture_format] == 'DXGI_FORMAT_BC1_UNORM':
+        return 'BC1'
+    elif DXGI_FORMAT[texture_format] == 'DXGI_FORMAT_BC1_UNORM_SRGB':
+        return 'BC1_SRGB'
+    elif DXGI_FORMAT[texture_format] == 'DXGI_FORMAT_BC7_UNORM':
+        return 'BC7'
+    elif DXGI_FORMAT[texture_format] == 'DXGI_FORMAT_BC7_UNORM_SRGB':
+        return 'BC7_SRGB'
+    elif DXGI_FORMAT[texture_format] == 'DXGI_FORMAT_R8G8B8A8_UNORM':
+        return 'RGBA'
+    elif DXGI_FORMAT[texture_format] == 'DXGI_FORMAT_R8G8B8A8_UNORM_SRGB':
+        return 'RGBA_SRGB'
+    elif DXGI_FORMAT[texture_format] == 'DXGI_FORMAT_BC3_UNORM_SRGB':
+        return 'BC3_SRGB'
+    elif DXGI_FORMAT[texture_format] == 'DXGI_FORMAT_BC4_UNORM':
+        return 'BC4'
+    elif DXGI_FORMAT[texture_format] == 'DXGI_FORMAT_BC5_UNORM':
+        return 'BC5'
+    else:
+        return DXGI_FORMAT[texture_format]
+
+
+def get_image_from_file(file_path, all_file_info, save_path=None):
     file_name = file_path.split('/')[-1].split('.')[0]
     file_pkg = file_path.split('/')[-2]
     # To get the actual image data we need to pull this specific file's data from the database as it references its file
     # in its RefID.
     # TODO FIX THIS REMOVE IT BAD BAD BAD
-    entries = pkg_db.get_entries_from_table(file_pkg, 'FileName, RefID, RefPKG, FileType')
-    this_entry = [x for x in entries if x[0] == file_name][0]
-    ref_file_name = f'{this_entry[2][2:]}-{gf.fill_hex_with_zeros(this_entry[1][2:], 4)}'
-    ref_pkg = gf.get_pkg_name(ref_file_name)
-    if this_entry[-1] == 'Texture Header':
+    ref_file = f"{all_file_info[file_name]['RefPKG'][2:]}-{all_file_info[file_name]['RefID'][2:]}"
+    ref_pkg = gf.get_pkg_name(ref_file)
+    if all_file_info[file_name]['FileType'] == 'Texture Header':
         header_hex = gf.get_hex_data(file_path)
-        data_hex = gf.get_hex_data(f'C:/d2_output/{ref_pkg}/{ref_file_name}.bin')
-    elif this_entry[-1] == 'Texture Data':
+        data_hex = gf.get_hex_data(f'I:/d2_output_3_0_2_0/{ref_pkg}/{ref_file}.bin')
+    elif all_file_info[file_name]['FileType'] == 'Texture Data':
         print('Only pass through header please, cba to fix this.')
         return
     else:
-        print(f"File given is not texture data or header of type {this_entry[-1]}")
+        print(f"File given is not texture data or header of type {all_file_info[file_name]['FileType']}")
         return
     header = get_header(header_hex)
     dimensions = [header.Width, header.Height]
@@ -231,15 +258,15 @@ def get_image_from_file(file_path, save_path=None):
     if large_tex_hash != 'FFFFFFFF':
         large_file = gf.get_file_from_hash(large_tex_hash)
         pkg_name = gf.get_pkg_name(large_file)
-        data_hex = gf.get_hex_data(f'C:/d2_output/{pkg_name}/{large_file}.bin')
-    print(ref_file_name)
+        data_hex = gf.get_hex_data(f'I:/d2_output_3_0_2_0/{pkg_name}/{large_file}.bin')
+    print(ref_file)
     img = get_image_from_data(header, dimensions, data_hex)
     if img:
         if save_path:
             img.save(f'{save_path}/{file_name}.png')
-        else:
-            img.save(f'C:/d2_output_2_9_2_0_images/{file_pkg}/{file_name}.png')
-            img.show()
+        # else:
+        #     img.save(f'C:/d2_output_2_9_2_0_images/{file_pkg}/{file_name}.png')
+        #     img.show()
 
 
 def get_image_from_data(header, dimensions, data_hex):

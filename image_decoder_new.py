@@ -37,6 +37,7 @@ class ImageHeader:
     LargeTextureHash: np.uint32 = np.uint32(0)  # 3C
 
 
+
 # This header includes the magic number, DDS header, and DXT10 DDS header
 @dataclass
 class DDSHeader:
@@ -92,8 +93,11 @@ def get_header(file_hex):
     # Some other unsupported formats: DXGI_FORMAT_R8_UNORM, DXGI_FORMAT_R16G16B16A16_FLOAT, DXGI_FORMAT_BC5_UNORM
 
 
+old_dir = ''
+
+
 def get_image_from_file(file_path, all_file_info, save_path=None):
-    pkg_db.start_db_connection()
+    # pkg_db.start_db_connection()
     file_name = file_path.split('/')[-1].split('.')[0]
     file_pkg = file_path.split('/')[-2]
     # To get the actual image data we need to pull this specific file's data from the database as it references its file
@@ -106,7 +110,7 @@ def get_image_from_file(file_path, all_file_info, save_path=None):
     ref_pkg = gf.get_pkg_name(ref_file_name)
     if entry['FileType'] == 'Texture Header':
         header_hex = gf.get_hex_data(file_path)
-        data_hex = gf.get_hex_data(f'I:/d2_output_3_0_1_3/{ref_pkg}/{ref_file_name}.bin')
+        data_hex = gf.get_hex_data(f'I:/d2_output_3_0_2_0/{ref_pkg}/{ref_file_name}.bin')
     elif entry['FileType'] == 'Texture Data':
         print('Only pass through header please, cba to fix this.')
         return
@@ -120,14 +124,14 @@ def get_image_from_file(file_path, all_file_info, save_path=None):
     if large_tex_hash != 'FFFFFFFF':
         large_file = gf.get_file_from_hash(large_tex_hash)
         pkg_name = gf.get_pkg_name(large_file)
-        data_hex = gf.get_hex_data(f'I:/d2_output_3_0_1_3/{pkg_name}/{large_file}.bin')
+        data_hex = gf.get_hex_data(f'I:/d2_output_3_0_2_0/{pkg_name}/{large_file}.bin')
     print(file_name, ref_file_name)
     img = get_image_from_data(header, dimensions, data_hex, save_path)
     if img:
         if save_path:
-            img.save(f'{save_path}/{file_name}.png')
+            img.save(f'{save_path}')
         else:
-            img.save(f'I:/d2_output_3_0_1_3_images/{file_pkg}/{file_name}.png')
+            img.save(f'I:/d2_output_3_0_2_0_images/{file_pkg}/{file_name}.png')
             img.show()
 
 
@@ -222,6 +226,7 @@ def bc_decomp(header, data_hex, save_path):
         else:
             bc1_header.miscFlag = 0
             bc1_header.arraySize = 1
+            # return  # Used to only export cubemaps
         # int(((int(bc1_header.dwWidth) * int(bc1_header.dwHeight)) + 320) / c_data_size)
     else:
         bc1_header.dwPFFlags = 0x1 + 0x40  # contains alpha data + contains uncompressed RGB data
@@ -229,6 +234,7 @@ def bc_decomp(header, data_hex, save_path):
         bc1_header.miscFlag = 0
         bc1_header.arraySize = 1
         bc1_header.miscFlags2 = 0x1 #?
+        # return
     # print(f'Array size {bc1_header.arraySize}')
     # if 'BC' in DXGI_FORMAT[header.TextureFormat]:
     #     with open(save_path, 'wb') as b:
@@ -282,4 +288,4 @@ if __name__ == '__main__':
     pkg_db.start_db_connection()
     all_file_info = {x: y for x,y in {x[0]: dict(zip(['RefID', 'RefPKG', 'FileType'], x[1:])) for x in
                     pkg_db.get_entries_from_table('Everything', 'FileName, RefID, RefPKG, FileType')}.items() if y['FileType'] == 'Texture Header'}
-    get_image_from_file(f'I:/d2_output_3_0_1_3/{pkg}/{img}.bin', all_file_info, f'imgtests/edz_0219/{img}.dds')
+    get_image_from_file(f'I:/d2_output_3_0_2_0/{pkg}/{img}.bin', all_file_info, f'imgtests/edz_0219/{img}.dds')

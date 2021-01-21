@@ -8,19 +8,19 @@ import re
 
 
 def get_shader(model_file, submesh, all_file_info, name):
-    shader = met.File(uid=submesh.material.fhex[0x2C8 * 2:0x2C8 * 2 + 8])
+    shader = met.File(uid=submesh.material.fb[0x298:0x298 + 4].hex())
     shader.get_file_from_uid()
     shader_ref = f"{all_file_info[shader.name]['RefPKG'][2:]}-{all_file_info[shader.name]['RefID'][2:]}"
     get_decompiled_hlsl(shader_ref, model_file.uid)
-    convert_hlsl(submesh.material, submesh.textures, shader_ref, model_file.uid, all_file_info, name)
+    convert_hlsl(submesh.material, submesh.textures, [], shader_ref, model_file.uid, all_file_info, name)
 
 
 def get_shader_from_mat(material, textures, cbuffer_offsets, all_file_info, custom_dir):
     # Overwrite
     gf.mkdir(custom_dir)
-    if material.name + '_o0.usf' in os.listdir(custom_dir):
-        return
-    shader = met.File(uid=material.fhex[0x2C8 * 2:0x2C8 * 2 + 8])
+    # if material.name + '_o0.usf' in os.listdir(custom_dir):
+    #     return
+    shader = met.File(uid=material.fb[0x298:0x298 + 4].hex())
     shader.get_file_from_uid()
     shader_ref = f"{all_file_info[shader.name]['RefPKG'][2:]}-{all_file_info[shader.name]['RefID'][2:]}"
     get_decompiled_hlsl(shader_ref, custom_dir)
@@ -32,13 +32,14 @@ def get_decompiled_hlsl(shader_ref, custom_dir):
     pkg_name = gf.get_pkg_name(shader_ref)
 
 
-    os.system(f'start hlsl/decomp.exe -D I:/d2_output_3_0_0_4/{pkg_name}/{shader_ref}.bin')
-    num = len(os.listdir(f'I:/d2_output_3_0_0_4/{pkg_name}/'))
+    os.system(f'start hlsl/decomp.exe -D I:/d2_output_3_0_2_0/{pkg_name}/{shader_ref}.bin')
+    num = len(os.listdir(f'I:/d2_output_3_0_2_0/{pkg_name}/'))
     while True:
-        if num != len(os.listdir(f'I:/d2_output_3_0_0_4/{pkg_name}/')):
+        if num != len(os.listdir(f'I:/d2_output_3_0_2_0/{pkg_name}/')):
+            time.sleep(0.1)
             break
 
-    shutil.move(f'C:/d2_output/{pkg_name}/{shader_ref}.hlsl', f'{custom_dir}/{shader_ref}.hlsl')
+    shutil.move(f'I:/d2_output_3_0_2_0/{pkg_name}/{shader_ref}.hlsl', f'{custom_dir}/{shader_ref}.hlsl')
     print(f'Decompiled and moved shader {shader_ref}.hlsl')
 
 
@@ -230,32 +231,37 @@ def get_in_out(text, instructions):
 def get_all_cbuffers_from_file(material, cbuffer_offsets, all_file_info):
     cbuffers = {}
     # Read cbuffer from file if there
-    if material.fhex[0x34C*2:0x34C*2+8] != 'FFFFFFFF':
-        cbuffer_header = met.File(uid=material.fhex[0x34C*2:0x34C*2+8])
+    if material.fb[0x30C:0x30C+4] != b'\xFF\xFF\xFF\xFF':
+        cbuffer_header = met.File(uid=material.fb[0x30C:0x30C+4].hex())
         cbuffer_header.get_file_from_uid()
         cbuffer_ref = met.File(name=f"{all_file_info[cbuffer_header.name]['RefPKG'][2:]}-{all_file_info[cbuffer_header.name]['RefID'][2:]}")
-        cbuffer_ref.get_hex_data()
-        data, length = process_cbuffer_data(cbuffer_ref.fhex)
+        cbuffer_ref.get_pkg_name()
+        cbuffer_ref.get_fb()
+        data, length = process_cbuffer_data(cbuffer_ref.fb)
         cbuffers[length] = data
 
     # Reading from mat file as well in case there's more cbuffers
     # offsets = [m.start() for m in re.finditer('90008080', material.fhex)]
     # If cbuffer is a real cbuffer we'll read it and output it
     for offset in cbuffer_offsets:
-        offset += 16
-        count = int(gf.get_flipped_hex(material.fhex[offset-16:offset-8], 8), 16)
+        offset += 8
+        count = gf.get_uint32(material.fb, offset-8)
         if count != 1:
-            data, length = process_cbuffer_data(material.fhex[offset+16:offset+16+32*count])
+            data, length = process_cbuffer_data(material.fb[offset+8:offset+8+16*count])
             cbuffers[length] = data
         # else:
             # raise Exception('No cbuffer found.')
     return cbuffers
 
 
-def process_cbuffer_data(fhex):
+def process_cbuffer_data(fb):
     cbuffer_out = []
-    cbuffer = [struct.unpack('f', bytes.fromhex(fhex[i:i + 8]))[0] for i in
-               range(0, len(fhex), 8)]
+    cbuffer = [struct.unpack('f', fb[i:i + 4])[0] for i in
+               range(0, len(fb), 4)]
     for i in range(0, len(cbuffer), 4):
         cbuffer_out.append(f'   float4({cbuffer[i]}, {cbuffer[i + 1]}, {cbuffer[i + 2]}, {cbuffer[i + 3]}),')
     return '\n'.join(cbuffer_out), int(len(cbuffer) / 4)
+
+
+if __name__ == '__main__':
+    convert_hlsl(material, textures, cbuffer_offsets, shader_ref, custom_dir, all_file_info)

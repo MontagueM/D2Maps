@@ -4,11 +4,10 @@ con = None
 c = None
 
 
-def start_db_connection():
+def start_db_connection(version):
     global con
     global c
-    version = '3_0_1_0'
-    con = sq.connect(f'I:/d2_pkg_db/{version}.db')
+    con = sq.connect(version)
     c = con.cursor()
 
 

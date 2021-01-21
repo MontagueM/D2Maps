@@ -122,13 +122,13 @@ def add_emissive_colour_nodes():
 
 
 # add_tex_samples()
-top_path = 'C:/Users/monta/Documents/Unreal Projects/MapsShaderTests/Content/'
+top_path = 'C:/Users/monta/Documents/Unreal Projects/DynamicShaders/Content/'
 # top_path = 'C:/Users/monta/Documents/Unreal Projects/ShaderTests/Content/'
 
 game_path = '/Game/'
 # specific_path = '/0A49EB80/'
-material_path = 'test/'
-texture_path = 'HangarAndRest/'
-shader_path = 'HangarAndRest/'
+material_path = 'smallcreation/'
+texture_path = 'smallcreation/'
+shader_path = 'smallcreation/'
 done_usfs = []
 get_all_materials()
