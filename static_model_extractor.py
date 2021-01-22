@@ -80,7 +80,7 @@ class Model:
         self.pos_verts = []
         self.extra_verts_file = None
         self.uv_verts = []
-        self.norm_verts = []
+        self.vertex_colour = []
         self.faces_file = None
         self.faces = []
 
@@ -89,8 +89,8 @@ class Submesh:
     def __init__(self):
         self.pos_verts = []
         self.adjusted_pos_verts = []
-        self.norm_verts = []
         self.uv_verts = []
+        self.vertex_colour = []
         self.faces = []
         self.material = None
         self.textures = []
@@ -161,11 +161,27 @@ def get_model_data(model_file: ModelFile, all_file_info):
         if model.extra_verts_file:
             coords = get_verts_data(model.extra_verts_file, all_file_info, is_uv=True)
             model.uv_verts = coords[0]
-            model.norm_verts = coords[1]
             model.uv_verts = scale_and_repos_uv_verts(model.uv_verts, model_file)
+
+        if model.vert_colour_file:
+            model.vertex_colour = get_vert_colour(model.vert_colour_file, all_file_info)
         model.faces = get_faces_data(model.faces_file, all_file_info)
     return True
 
+
+def get_vert_colour(vc_file, all_file_info):
+    vc_ref = f"{all_file_info[vc_file.name]['RefPKG'][2:]}-{all_file_info[vc_file.name]['RefID'][2:]}"
+    fb = open(f'I:/d2_output_3_0_2_0/{gf.get_pkg_name(vc_ref)}/{vc_ref}.bin', 'rb').read()
+
+    vert_colours = []
+    for i in range(0, len(fb), 4):
+        vc = [x/255 for x in fb[i:i+4]]
+        vert_colours.append(vc)
+        # if vcs[-1] != 1.0:  # Dyn only??
+        #     vcs = [0, 0, 0, 0]
+    if not any([x != [0, 0, 0, 0] for x in vert_colours]):
+        vert_colours = []
+    return vert_colours
 
 def get_model_files(model_file: ModelFile):
     # Also due to new type
@@ -209,9 +225,10 @@ def get_model_files(model_file: ModelFile):
             faces_hash = relevant_fb[16 * i:16 * i + 4]
             pos_verts_file = relevant_fb[16 * i + 4:16 * i + 8]
             uv_verts_file = relevant_fb[16 * i + 8:16 * i + 12]
+            vert_colour_file = relevant_fb[16 * i + 12:16 * i + 16]
             if pos_verts_file == '' or faces_hash == '':
                 return
-        for j, hsh in enumerate([faces_hash, pos_verts_file, uv_verts_file]):
+        for j, hsh in enumerate([faces_hash, pos_verts_file, uv_verts_file, vert_colour_file]):
             hf = HeaderFile()
             hf.uid = hsh.hex()
             hf.name = hf.get_file_from_uid()
@@ -227,9 +244,14 @@ def get_model_files(model_file: ModelFile):
                 else:
                     hf.header = hf.get_header()
                     model.extra_verts_file = hf
+            elif j == 3:
+                # if not hf.pkg_name:
+                #     print('No vert colour file found')
+                # else:
+                hf.header = hf.get_header()
+                model.vert_colour_file = hf
         models.append(model)
-        if model_file.new_type:
-            break
+
     model_file.models = models
     return True
 
@@ -245,7 +267,7 @@ def get_submeshes(model_file: ModelFile):
         submesh.faces = model.faces[int(faces_offset / 3):int((faces_offset + faces_length) / 3)]
         submesh.pos_verts = trim_verts_data(model.pos_verts, submesh.faces)
         submesh.uv_verts = trim_verts_data(model.uv_verts, submesh.faces)
-        submesh.norm_verts = trim_verts_data(model.norm_verts, submesh.faces)
+        submesh.vertex_colour = trim_verts_data(model.vertex_colour, submesh.faces)
         submesh.type = 'New'
         model.submeshes.append(submesh)
     else:
@@ -274,7 +296,7 @@ def get_submeshes(model_file: ModelFile):
             submesh.faces = model.faces[int(e.Offset/3):int((e.Offset + e.FacesLength)/3)]
             submesh.pos_verts = trim_verts_data(model.pos_verts, submesh.faces)
             submesh.uv_verts = trim_verts_data(model.uv_verts, submesh.faces)
-            submesh.norm_verts = trim_verts_data(model.norm_verts, submesh.faces)
+            submesh.vertex_colour = trim_verts_data(model.vertex_colour, submesh.faces)
             submesh.type = e.EntryType
             if i in relevant_textures.keys():
                 submesh.material = File(name=relevant_textures[i])
@@ -593,21 +615,25 @@ def export_fbx(model_file: ModelFile, submesh: Submesh, name):
     model = pfb.Model()
     node, mesh = create_mesh(model, submesh.pos_verts, submesh.faces, name)
     # Disabled materials for now
+    if not mesh.GetLayer(0):
+        mesh.CreateLayer()
+    layer = mesh.GetLayer(0)
+
     if submesh.material:
-        get_submesh_textures(model_file, submesh, hash64_table, all_file_info)
+        # get_submesh_textures(model_file, submesh, hash64_table, all_file_info)
         # shaders.get_shader(model_file, submesh, all_file_info, name)
-        apply_shader(model, model_file, submesh, node)
+        # apply_shader(model, model_file, submesh, node)
         print(f'submesh {name} has mat file {submesh.material.name} with textures {submesh.textures}')
         if submesh.diffuse:
-            if not mesh.GetLayer(0):
-                mesh.CreateLayer()
-            layer = mesh.GetLayer(0)
-
             # apply_diffuse(model, submesh.diffuse, f'I:/static_models/{model_file.uid}/textures/{submesh.diffuse}.png', node)
-
-            create_uv(mesh, submesh.diffuse, submesh.uv_verts, layer)
             # set_normals(mesh, submesh.diffuse, submesh.norm_verts, layer)
             node.SetShadingMode(fbx.FbxNode.eTextureShading)
+
+    if submesh.uv_verts:
+        create_uv(mesh, submesh.diffuse, submesh.uv_verts, layer)
+    if submesh.vertex_colour:
+        add_vert_colours(mesh, model_file, submesh, layer)
+
     model.scene.GetRootNode().AddChild(node)
 
     # Disabled shaders for now
@@ -616,6 +642,18 @@ def export_fbx(model_file: ModelFile, submesh: Submesh, name):
 
     model.export(save_path=f'I:/static_models/{model_file.uid}/{name}.fbx', ascii_format=False)
     print('Exported')
+
+
+def add_vert_colours(mesh, name, submesh: Submesh, layer):
+    vertColourElement = fbx.FbxLayerElementVertexColor.Create(mesh, f'colour')
+    vertColourElement.SetMappingMode(fbx.FbxLayerElement.eByControlPoint)
+    vertColourElement.SetReferenceMode(fbx.FbxLayerElement.eDirect)
+    # mesh.InitTextureUV()
+    for i, p in enumerate(submesh.vertex_colour):
+        # vertColourElement.GetDirectArray().Add(fbx.FbxColor(p[0], p[1], p[2], 1))
+        vertColourElement.GetDirectArray().Add(fbx.FbxColor(p[0], p[1], p[2], p[3]))
+
+    layer.SetVertexColors(vertColourElement)
 
 
 def get_shader_info(model_file):
@@ -803,4 +841,4 @@ if __name__ == '__main__':
     pkg_db.start_db_connection(f'I:/d2_pkg_db/hash64/{version}.db')
     hash64_table = {x: y for x, y in pkg_db.get_entries_from_table('Everything', 'Hash64, Reference')}
 
-    get_model('124CC680')
+    get_model('7DCBBE80')
