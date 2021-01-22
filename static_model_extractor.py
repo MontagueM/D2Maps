@@ -79,6 +79,7 @@ class Model:
         self.pos_verts_file = None
         self.pos_verts = []
         self.extra_verts_file = None
+        self.vert_colour_file = None
         self.uv_verts = []
         self.vertex_colour = []
         self.faces_file = None
@@ -217,6 +218,7 @@ def get_model_files(model_file: ModelFile):
             faces_hash = model_file.model_file_fb[offset+8:offset+12]
             pos_verts_file = model_file.model_file_fb[offset+12:offset+16]
             uv_verts_file = model_file.model_file_fb[offset+16:offset+20]
+            vert_colour_file = None
             if pos_verts_file == '' or faces_hash == '':
                 return
 
@@ -229,6 +231,8 @@ def get_model_files(model_file: ModelFile):
             if pos_verts_file == '' or faces_hash == '':
                 return
         for j, hsh in enumerate([faces_hash, pos_verts_file, uv_verts_file, vert_colour_file]):
+            if not hsh:
+                continue
             hf = HeaderFile()
             hf.uid = hsh.hex()
             hf.name = hf.get_file_from_uid()
@@ -248,8 +252,9 @@ def get_model_files(model_file: ModelFile):
                 # if not hf.pkg_name:
                 #     print('No vert colour file found')
                 # else:
-                hf.header = hf.get_header()
-                model.vert_colour_file = hf
+                if vert_colour_file and vert_colour_file != b'\xFF\xFF\xFF\xFF':
+                    hf.header = hf.get_header()
+                    model.vert_colour_file = hf
         models.append(model)
 
     model_file.models = models

@@ -220,7 +220,7 @@ def get_shader_info(d2map: Map):
         met.get_shader_file(material, textures, cbuffer_offsets, all_file_info, custom_dir=f'I:/maps/{d2map.pkg_name}_fbx/shaders/')
 
 
-def add_model_to_fbx_map(name, submesh, model_file, cc, max_vert_used, d2map, nums, mesh, unreal, apply_textures, shaders):
+def add_model_to_fbx_map(name, submesh: met.Submesh, model_file, cc, max_vert_used, d2map, nums, mesh, unreal, apply_textures, shaders):
     if cc == 0:
         submesh.faces, max_vert_used = met.adjust_faces_data(submesh.faces, max_vert_used)
         submesh.faces = met.shift_faces_down(submesh.faces)
@@ -230,7 +230,10 @@ def add_model_to_fbx_map(name, submesh, model_file, cc, max_vert_used, d2map, nu
             mesh.CreateLayer()
         layer = mesh.GetLayer(0)
 
-        create_uv(mesh, name, submesh, layer)
+        if submesh.uv_verts:
+            create_uv(mesh, name, submesh, layer)
+        if submesh.vertex_colour:
+            add_vert_colours(mesh, model_file, submesh, layer)
 
     node = fbx.FbxNode.Create(d2map.fbx_model.scene, name)
     node.SetRotationActive(True)
@@ -267,18 +270,17 @@ def add_model_to_fbx_map(name, submesh, model_file, cc, max_vert_used, d2map, nu
 
     return mesh, max_vert_used
 
-# def add_model_to_fbx_map(d2map: Map, model_file: met.ModelFile, submesh: met.Submesh, name, shaders):
-#     node, mesh = create_mesh(d2map, submesh, name)
-#     # met.get_submesh_textures(model_file, submesh, custom_dir=f'C:/d2_maps/{d2map.pkg_name}_fbx/textures/')
-#     if not mesh.GetLayer(0):
-#         mesh.CreateLayer()
-#     layer = mesh.GetLayer(0)
-#     if shaders:
-#         apply_shader(d2map, submesh, node)
-#     # apply_diffuse(d2map, submesh, node)
-#     create_uv(mesh, name, submesh, layer)
-#     node.SetShadingMode(fbx.FbxNode.eTextureShading)
-#     d2map.fbx_model.scene.GetRootNode().AddChild(node)
+
+def add_vert_colours(mesh, name, submesh: met.Submesh, layer):
+    vertColourElement = fbx.FbxLayerElementVertexColor.Create(mesh, f'colour')
+    vertColourElement.SetMappingMode(fbx.FbxLayerElement.eByControlPoint)
+    vertColourElement.SetReferenceMode(fbx.FbxLayerElement.eDirect)
+    # mesh.InitTextureUV()
+    for i, p in enumerate(submesh.vertex_colour):
+        # vertColourElement.GetDirectArray().Add(fbx.FbxColor(p[0], p[1], p[2], 1))
+        vertColourElement.GetDirectArray().Add(fbx.FbxColor(p[0], p[1], p[2], p[3]))
+
+    layer.SetVertexColors(vertColourElement)
 
 
 def apply_shader(d2map: Map, submesh: met.Submesh, node):
@@ -370,7 +372,7 @@ def unpack_folder(pkg_name, unreal, shaders, apply_textures):
             # a = [x.split('.')[0] for x in os.listdir('C:\d2_maps/orphaned_0932_fbx/')]
             # if file_name in [x.split('.')[0] for x in os.listdir(f'C:\d2_maps/{pkg_name}_fbx/')]:
             #     continue
-            if '0C7C' not in file_name:
+            if '1DF7' not in file_name:
                 continue
             print(f'Unpacking {file_name}')
             unpack_map(file_name, pkg_name, unreal, shaders, apply_textures)
@@ -389,5 +391,5 @@ if __name__ == '__main__':
     all_file_info = {x[0]: dict(zip(['RefID', 'RefPKG', 'FileType'], x[1:])) for x in
                      pkg_db.get_entries_from_table('Everything', 'FileName, RefID, RefPKG, FileType')}
 
-    unpack_folder('europa_0232', unreal=True, shaders=True, apply_textures=False)
+    unpack_folder('dreaming_city_0176', unreal=False, shaders=False, apply_textures=False)
     # unpack_location('')
