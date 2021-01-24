@@ -394,4 +394,4 @@ if __name__ == '__main__':
     # unpack_folder('edz_021c', unreal=False, shaders=True, apply_textures=False)
     # unpack_location('')
     name = '019D-0DA2'
-    unpack_map(name, gf.get_pkg_name(name), unreal=False, shaders=False, apply_textures=False)
+    unpack_map(name, gf.get_pkg_name(name), unreal=False, shaders=True, apply_textures=False)

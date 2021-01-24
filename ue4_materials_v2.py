@@ -70,7 +70,6 @@ def modify_new_materials(mats_texs):
                         x.set_editor_property('code', code)
                         x.set_editor_property('inputs', inputs)
                         x.set_editor_property('output_type', unreal.CustomMaterialOutputType.CMOT_FLOAT4)
-                        unreal.MaterialEditingLibrary.recompile_material(mat)
 
                     # Adding texture links
 
@@ -81,6 +80,9 @@ def modify_new_materials(mats_texs):
                                                                                         unreal.MaterialExpressionTextureCoordinate,
                                                                                         -3000, -1000)
                     unreal.MaterialEditingLibrary.connect_material_expressions(texcoord, '', x, 'tx')
+
+
+        unreal.MaterialEditingLibrary.recompile_material(mat)
 
 
 def add_tex_samples(mat, texs):
@@ -104,47 +106,23 @@ def main():
     modify_new_materials(mats_texs)
 
 
+def recompile_materials():
+    for asset in unreal.EditorAssetLibrary.list_assets(game_path + material_path):
+        asset_data = unreal.EditorAssetLibrary.find_asset_data(asset)
+        if asset_data.asset_class != "Material":
+            continue
+        matname = unreal.Paths.get_base_filename(asset)
+        mat = unreal.load_asset(game_path + material_path + matname)
+        unreal.MaterialEditingLibrary.recompile_material(mat)
+
 if __name__ == '__main__':
     top_path = 'C:/Users/monta/Documents/Unreal Projects/DynamicShaders/Content/'
 
     game_path = '/Game/'
-    material_path = 'TemplateTests/'
-    texture_path = 'edz_021c_16b9/'
-    shader_path = 'TemplateTests/'
+    material_path = 'greenhouse_019d_0da2/'
+    texture_path = 'greenhouse_019d_0da2/'
+    shader_path = 'greenhouse_019d_0da2/'
     estack_template = game_path + '/Template/EStackTemplate'
     done_usfs = []
     main()
-    """
-    for asset in unreal.EditorAssetLibrary.list_assets(game_path + material_path):
-        asset_data = unreal.EditorAssetLibrary.find_asset_data(asset)
-        if asset_data.asset_class == "Material":
-            matname = unreal.Paths.get_base_filename(asset)
-            print(matname)
-            if matname != 'tests':
-                continue
-            matpath = game_path + material_path + matname
-            mat = unreal.load_asset(matpath)
-    
-            it = unreal.ObjectIterator()
-            dic = {'RT0': [1, 2, 3], 'RT1': [5, 2, 2, 2, 2], 'RT2': [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1]}
-            for x in it:
-                if x.get_outer() == mat:
-                    if isinstance(x, unreal.MaterialExpressionCustom):
-                        code = '#include.usf"\nreturn 0;'
-                        inputs = []
-                        desc = x.get_editor_property('desc')
-                        if desc not in dic:
-                            raise Exception('Incorrect template')
-                        textures = dic[desc]
-                        for i in range(len(textures)):
-                            ci = unreal.CustomInput()
-                            ci.set_editor_property('input_name', 't' + str(i))
-                            inputs.append(ci)
-                        ci = unreal.CustomInput()
-                        ci.set_editor_property('input_name', 'tx')
-                        inputs.append(ci)
-                        x.set_editor_property('code', code)
-                        x.set_editor_property('inputs', inputs)
-                        x.set_editor_property('output_type', unreal.CustomMaterialOutputType.CMOT_FLOAT4)
-                        unreal.MaterialEditingLibrary.recompile_material(mat)
-    """
+    # recompile_materials()
