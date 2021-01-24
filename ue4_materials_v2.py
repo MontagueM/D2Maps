@@ -12,7 +12,7 @@ from shutil import copyfile
 
 def get_valid_materials_textures():
     mats_texs = {}
-    for asset in unreal.EditorAssetLibrary.list_assets(game_path + material_path):
+    for asset in unreal.EditorAssetLibrary.list_assets(game_path + material_path, recursive=False):
         asset_data = unreal.EditorAssetLibrary.find_asset_data(asset)
         if asset_data.asset_class != "Material":
             continue
@@ -23,6 +23,8 @@ def get_valid_materials_textures():
         #     continue
 
         usf = asset.split('.')[-1].split('_')[0] + '_o0.usf'
+        if 'FBFF' in usf:
+            continue
         with open(top_path + shader_path + '/shaders/' + usf) as f:
             f = f.readlines()
             textures = f[1].split("', '")
@@ -119,9 +121,9 @@ if __name__ == '__main__':
     top_path = 'C:/Users/monta/Documents/Unreal Projects/DynamicShaders/Content/'
 
     game_path = '/Game/'
-    material_path = 'greenhouse_019d_0da2/'
-    texture_path = 'greenhouse_019d_0da2/'
-    shader_path = 'greenhouse_019d_0da2/'
+    material_path = 'drifter/'
+    texture_path = 'drifter/'
+    shader_path = 'drifter/'
     estack_template = game_path + '/Template/EStackTemplate'
     done_usfs = []
     main()
