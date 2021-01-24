@@ -200,7 +200,7 @@ def get_instructions(text):
                 # cmp seems broken
                 ret = ret.replace('cmp', '')
                 # discard doesnt work in ue4 hlsl
-                ret = ret.replace('discard', '{ o0.w = 0; }')
+                ret = ret.replace('discard', '{ o0.w = 1; return o0; }')
                 # just in case theres some stupid other texture calls
                 return ret
         elif 'void main(' in line:

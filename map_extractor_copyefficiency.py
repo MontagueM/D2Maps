@@ -372,7 +372,7 @@ def unpack_folder(pkg_name, unreal, shaders, apply_textures):
             # a = [x.split('.')[0] for x in os.listdir('C:\d2_maps/orphaned_0932_fbx/')]
             # if file_name in [x.split('.')[0] for x in os.listdir(f'C:\d2_maps/{pkg_name}_fbx/')]:
             #     continue
-            if '1DF7' not in file_name:
+            if '16B9' not in file_name:
                 continue
             print(f'Unpacking {file_name}')
             unpack_map(file_name, pkg_name, unreal, shaders, apply_textures)
@@ -391,5 +391,7 @@ if __name__ == '__main__':
     all_file_info = {x[0]: dict(zip(['RefID', 'RefPKG', 'FileType'], x[1:])) for x in
                      pkg_db.get_entries_from_table('Everything', 'FileName, RefID, RefPKG, FileType')}
 
-    unpack_folder('dreaming_city_0176', unreal=False, shaders=False, apply_textures=False)
+    # unpack_folder('edz_021c', unreal=False, shaders=True, apply_textures=False)
     # unpack_location('')
+    name = '019D-0DA2'
+    unpack_map(name, gf.get_pkg_name(name), unreal=False, shaders=False, apply_textures=False)

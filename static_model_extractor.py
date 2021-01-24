@@ -627,7 +627,7 @@ def export_fbx(model_file: ModelFile, submesh: Submesh, name):
     if submesh.material:
         # get_submesh_textures(model_file, submesh, hash64_table, all_file_info)
         # shaders.get_shader(model_file, submesh, all_file_info, name)
-        # apply_shader(model, model_file, submesh, node)
+        apply_shader(model, model_file, submesh, node)
         print(f'submesh {name} has mat file {submesh.material.name} with textures {submesh.textures}')
         if submesh.diffuse:
             # apply_diffuse(model, submesh.diffuse, f'I:/static_models/{model_file.uid}/textures/{submesh.diffuse}.png', node)
@@ -846,4 +846,4 @@ if __name__ == '__main__':
     pkg_db.start_db_connection(f'I:/d2_pkg_db/hash64/{version}.db')
     hash64_table = {x: y for x, y in pkg_db.get_entries_from_table('Everything', 'Hash64, Reference')}
 
-    get_model('7DCBBE80')
+    get_model('DE4DC680')

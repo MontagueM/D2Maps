@@ -39,9 +39,26 @@ def modify_material(asset):
 
         texsamples = add_tex_samples(mat, textures)
         custexprs = add_cust_exprs(mat, usf, textures)
+        base_opacity = add_base_opacity(mat)
+        # normals = add_normal(mat)
+        # roughness = add_roughness(mat)
+        # emission = add_emission(mat)
+        # metallic = add_metallic(mat)
         connect_nodes(mat, texsamples, custexprs)
+
+        # Fixing for discard shaders
+        mat.blend_mode(1)  # Blend mode Masked
+        # Two sided?
+
+
         unreal.MaterialEditingLibrary.recompile_material(mat)
 #     file[:-7]
+
+
+def add_base_opacity(material):
+    break4 = unreal.MaterialEditingLibrary.create_material_expression(material,
+                                                                            unreal.MaterialExpression,
+                                                                            -300, 300*i)
 
 
 def connect_nodes(mat, texsamples, custexprs):
@@ -127,8 +144,8 @@ top_path = 'C:/Users/monta/Documents/Unreal Projects/DynamicShaders/Content/'
 
 game_path = '/Game/'
 # specific_path = '/0A49EB80/'
-material_path = 'smallcreation/'
-texture_path = 'smallcreation/'
-shader_path = 'smallcreation/'
+material_path = 'edz_021c_16b9/'
+texture_path = 'edz_021c_16b9/'
+shader_path = 'edz_021c_16b9/'
 done_usfs = []
 get_all_materials()
