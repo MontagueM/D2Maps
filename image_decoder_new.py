@@ -282,10 +282,11 @@ def get_image_from_data(header, dimensions, data_hex, save_path):
         # return False
     # return img
 
+
 if __name__ == '__main__':
-    img = '0172-06AC'
+    img = '0157-1B15'
     pkg = gf.get_pkg_name(img)
-    pkg_db.start_db_connection()
+    pkg_db.start_db_connection('I:/d2_pkg_db/3_0_2_0.db')
     all_file_info = {x: y for x,y in {x[0]: dict(zip(['RefID', 'RefPKG', 'FileType'], x[1:])) for x in
                     pkg_db.get_entries_from_table('Everything', 'FileName, RefID, RefPKG, FileType')}.items() if y['FileType'] == 'Texture Header'}
-    get_image_from_file(f'I:/d2_output_3_0_2_0/{pkg}/{img}.bin', all_file_info, f'imgtests/edz_0219/{img}.dds')
+    get_image_from_file(f'I:/d2_output_3_0_2_0/{pkg}/{img}.bin', all_file_info, f'imgtests/elsie/{img}.dds')

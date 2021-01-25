@@ -25,11 +25,15 @@ def get_valid_materials_textures():
         usf = asset.split('.')[-1].split('_')[0] + '_o0.usf'
         if 'FBFF' in usf:
             continue
-        with open(top_path + shader_path + '/shaders/' + usf) as f:
-            f = f.readlines()
-            textures = f[1].split("', '")
-            textures[0] = textures[0][4:]
-            textures[-1] = textures[-1][:-3]
+        try:
+            with open(top_path + shader_path + '/shaders/' + usf) as f:
+                f = f.readlines()
+                textures = f[1].split("', '")
+                textures[0] = textures[0][4:]
+                textures[-1] = textures[-1][:-3]
+        except FileNotFoundError:
+            print('Material has no textures')
+            continue
         matpath = matname
         mats_texs[matpath] = textures
     return mats_texs
@@ -121,9 +125,9 @@ if __name__ == '__main__':
     top_path = 'C:/Users/monta/Documents/Unreal Projects/DynamicShaders/Content/'
 
     game_path = '/Game/'
-    material_path = 'drifter/'
-    texture_path = 'drifter/'
-    shader_path = 'drifter/'
+    material_path = 'asc_servitor/'
+    texture_path = 'asc_servitor/'
+    shader_path = 'asc_servitor/'
     estack_template = game_path + '/Template/EStackTemplate'
     done_usfs = []
     main()

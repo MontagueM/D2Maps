@@ -10,6 +10,7 @@ import gf
 import quaternion
 import math
 from multiprocessing.dummy import Pool as ThreadPool
+import json
 
 
 @dataclass
@@ -66,10 +67,20 @@ def unpack_map(main_file, pkg_name, unreal, shaders, apply_textures):
     get_model_refs(d2map)
     get_copy_counts(d2map)
 
-    compute_coords(d2map, unreal, shaders, apply_textures)
+    helper_dict = compute_coords(d2map, unreal, shaders, apply_textures)
     if shaders:
         get_shader_info(d2map)
-    write_fbx(d2map)
+
+    if unreal:
+        write_helper_txt(d2map, helper_dict, pkg_name)
+
+    write_fbx(d2map, unreal)
+
+
+def write_helper_txt(d2map: Map, helper_dict, pkg_name):
+    # with open(f'I:/maps/{pkg_name}_fbx/{d2map.name}_unreal.txt', 'w') as f:
+    #     f.write(helper_dict)
+    json.dump(helper_dict, open(f'I:/maps/{pkg_name}_fbx/{d2map.name}_unreal.txt', 'w'))
 
 
 def get_fb_from_pkg(d2map: Map):
@@ -148,6 +159,7 @@ def get_transforms_array(model_refs, copy_counts, rotations, location, map_scale
 
 def compute_coords(d2map: Map, unreal, shaders, apply_textures):
     nums = 0
+    helper_dict = {}
 
     d2map.fbx_model.scene.GetRootNode().SetGeometricRotation(fbx.FbxNode.eSourcePivot, fbx.FbxVector4(-90, -25, -80))
     for i, data in enumerate(d2map.copy_counts):
@@ -173,8 +185,9 @@ def compute_coords(d2map: Map, unreal, shaders, apply_textures):
                 if submesh.type == 769 or submesh.type == 770 or submesh.type == 778 or submesh.type == 'New':
                     for cc in range(copy_count):
                         mesh, max_vert_used = add_model_to_fbx_map(f'{model_ref}_{cc}_{j}_{k}', submesh, model_file, cc, max_vert_used, d2map, nums, mesh, unreal, apply_textures, shaders)
-
+                        helper_dict[f'{model_ref}_{cc}_{j}_{k}'] = [d2map.locations[nums + cc], scipy.spatial.transform.Rotation.from_quat(d2map.rotations[nums + cc]).as_euler('xyz', degrees=True).tolist(), d2map.scales[nums + cc]]
         nums += copy_count
+    return helper_dict
 
 
 def get_map_scaled_verts(submesh: met.Submesh, map_scaler):
@@ -241,12 +254,13 @@ def add_model_to_fbx_map(name, submesh: met.Submesh, model_file, cc, max_vert_us
     node.SetNodeAttribute(mesh)
     loc_rot = d2map.locations[nums + cc]
     r = scipy.spatial.transform.Rotation.from_quat(rot).as_euler('xyz', degrees=True)
-    node.SetGeometricRotation(fbx.FbxNode.eSourcePivot, fbx.FbxVector4(-r[0] - 90, r[1] - 180, r[2]))
-    node.SetGeometricTranslation(fbx.FbxNode.eSourcePivot,
-                                 fbx.FbxVector4(loc_rot[0] * 100, loc_rot[1] * 100, loc_rot[2] * 100))
-    node.SetGeometricScaling(fbx.FbxNode.eSourcePivot,
-                             fbx.FbxVector4(d2map.scales[nums + cc] * 100, d2map.scales[nums + cc] * 100,
-                                            d2map.scales[nums + cc] * 100))
+    if not unreal:
+        node.SetGeometricRotation(fbx.FbxNode.eSourcePivot, fbx.FbxVector4(-r[0] - 90, r[1] - 180, r[2]))
+        node.SetGeometricTranslation(fbx.FbxNode.eSourcePivot,
+                                     fbx.FbxVector4(loc_rot[0] * 100, loc_rot[1] * 100, loc_rot[2] * 100))
+        node.SetGeometricScaling(fbx.FbxNode.eSourcePivot,
+                                 fbx.FbxVector4(d2map.scales[nums + cc] * 100, d2map.scales[nums + cc] * 100,
+                                                d2map.scales[nums + cc] * 100))
 
     node.SetShadingMode(fbx.FbxNode.eTextureShading)
 
@@ -261,12 +275,13 @@ def add_model_to_fbx_map(name, submesh: met.Submesh, model_file, cc, max_vert_us
         elif shaders:
             apply_shader(d2map, submesh, node)
 
-    if unreal:
-        d2map.fbx_model.scene.GetRootNode().AddChild(node)
-    else:
+    # if unreal:
+    #     d2map.fbx_model.scene.GetRootNode().AddChild(node)
+    # else:
         # Lcl seems to be the only thing that actually works around here
+    if not unreal:
         node.LclRotation.Set(fbx.FbxDouble3(-90, 180, 0))
-        d2map.fbx_model.scene.GetRootNode().AddChild(node)
+    d2map.fbx_model.scene.GetRootNode().AddChild(node)
 
     return mesh, max_vert_used
 
@@ -357,8 +372,11 @@ def create_uv(mesh, name, submesh: met.Submesh, layer):
     return layer
 
 
-def write_fbx(d2map: Map):
-    d2map.fbx_model.export(save_path=f'I:/maps/{d2map.pkg_name}_fbx/{d2map.name}_efficient.fbx', ascii_format=False)
+def write_fbx(d2map: Map, unreal):
+    if unreal:
+        d2map.fbx_model.export(save_path=f'I:/maps/{d2map.pkg_name}_fbx/{d2map.name}_unreal.fbx', ascii_format=False)
+    else:
+        d2map.fbx_model.export(save_path=f'I:/maps/{d2map.pkg_name}_fbx/{d2map.name}_efficient.fbx', ascii_format=False)
     print(f'Wrote fbx of {d2map.name}')
 
 
@@ -393,5 +411,5 @@ if __name__ == '__main__':
 
     # unpack_folder('edz_021c', unreal=False, shaders=True, apply_textures=False)
     # unpack_location('')
-    name = '019D-0DA2'
-    unpack_map(name, gf.get_pkg_name(name), unreal=False, shaders=True, apply_textures=False)
+    name = '01AD-0681'
+    unpack_map(name, gf.get_pkg_name(name), unreal=True, shaders=False, apply_textures=False)
