@@ -45,6 +45,7 @@ Methods:
 import os
 import unreal
 import json
+import time
 
 ue_path = 'C:/Users/monta/Documents/Unreal Projects/PythonMapImports/Content'
 
@@ -54,7 +55,7 @@ def import_map(file):
     task = unreal.AssetImportTask()
     task.set_editor_property('automated', True)
     task.set_editor_property('destination_name', '')
-    task.set_editor_property('destination_path', '/Game/LevelTestAssets')
+    task.set_editor_property('destination_path', '/Game/NoCopiesAssets')
     task.set_editor_property('filename', file)
     task.set_editor_property('replace_existing', True)
     task.set_editor_property('save', True)
@@ -89,23 +90,41 @@ def editor_level_lib(assets, helper, start, end):
     for i in range(start, end):
         a = assets[i]
         name = a.split('.')[0].split('_unreal_')[-1]
+        s = name.split('_')
+        # start_nums = int(s[4])
+        copy_count = int(s[3])
+        # name = s[0]
+        # name = a.split('.')[0].split('_')[1]
+
         # print(name)
+        # if '0D4BD580' not in name:
+        # if '734DD580' not in name and '0D4BD580' not in name:
+        #     continue
         # if name != '44A5B580_5_0_0':
         #     continue
-        a = unreal.EditorAssetLibrary.load_asset(a)
-        if name not in helper:
-            print(f'Missing file {name}')
-            continue
-        r = helper[name][1]
-        l = helper[name][0]
-        l = [-l[0]*100, l[1]*100, l[2]*100]
-        rotator = unreal.Rotator(r[0], r[1], -r[2])
-        s = unreal.EditorLevelLibrary.spawn_actor_from_object(a, location=l, rotation=rotator)  # l must be UE4 Object
-        s.set_actor_scale3d([helper[name][2]*100]*3)
+        sm = unreal.EditorAssetLibrary.load_asset(a)
+        # print(sm)
+        # continue
+        # print(sm)
+        # a = unreal.EditorAssetLibrary.load_asset('/Game/NoCopiesAssets/' + sm)
+        # if name not in helper:
+        #     print(f'Missing file {name}')
+        #     continue
+        # print(name)
+        for j in range(copy_count):
+            # print(copy_count)
+            r = helper[name][j][1]
+            l = helper[name][j][0]
+            l = [-l[0]*100, l[1]*100, l[2]*100]
+            rotator = unreal.Rotator(-r[0], r[1], -r[2])
+            s = unreal.EditorLevelLibrary.spawn_actor_from_object(sm, location=l, rotation=rotator)  # l must be UE4 Object
+            s.set_actor_scale3d([helper[name][j][2]*100]*3)
+        if i % 20 == 0:
+            unreal.EditorLevelLibrary.save_current_level()
 
 
 def get_loaded_assets(path):
-    return unreal.EditorAssetLibrary.list_assets(path, recursive=False)
+    return [x for x in unreal.EditorAssetLibrary.list_assets(path, recursive=False) if unreal.EditorAssetLibrary.find_asset_data(x).asset_class == 'StaticMesh']
 
 
 if __name__ == '__main__':
@@ -115,6 +134,5 @@ if __name__ == '__main__':
     # Test data
     map_path = 'I:/maps/city_tower_d2_01ad_fbx/01AD-0681_unreal.fbx'
     # import_map(map_path)
-    assets = get_loaded_assets('/Game/LevelTestAssets')
-    # print('assets', assets)
+    assets = get_loaded_assets('/Game/NoCopiesAssets')
     editor_level_lib(assets, helper, start=int(len(assets)/2), end=len(assets))

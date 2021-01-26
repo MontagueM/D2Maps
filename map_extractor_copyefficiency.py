@@ -11,6 +11,7 @@ import quaternion
 import math
 from multiprocessing.dummy import Pool as ThreadPool
 import json
+import random
 
 
 @dataclass
@@ -182,10 +183,18 @@ def compute_coords(d2map: Map, unreal, shaders, apply_textures):
         for j, model in enumerate(model_file.models):
             for k, submesh in enumerate(model.submeshes):
                 mesh = None
+                rand = random.randint(100000, 999999)
+                helper_dict[f'{model_ref}_{j}_{k}_{copy_count}_{rand}_'] = []
                 if submesh.type == 769 or submesh.type == 770 or submesh.type == 778 or submesh.type == 'New':
                     for cc in range(copy_count):
-                        mesh, max_vert_used = add_model_to_fbx_map(f'{model_ref}_{cc}_{j}_{k}', submesh, model_file, cc, max_vert_used, d2map, nums, mesh, unreal, apply_textures, shaders)
-                        helper_dict[f'{model_ref}_{cc}_{j}_{k}'] = [d2map.locations[nums + cc], scipy.spatial.transform.Rotation.from_quat(d2map.rotations[nums + cc]).as_euler('xyz', degrees=True).tolist(), d2map.scales[nums + cc]]
+                        if unreal:
+                            if cc == 0:
+                                mesh, max_vert_used = add_model_to_fbx_map(f'{model_ref}_{j}_{k}_{copy_count}_{rand}_', submesh,
+                                                                           model_file, cc, max_vert_used, d2map, nums,
+                                                                           mesh, unreal, apply_textures, shaders)
+                        else:
+                            mesh, max_vert_used = add_model_to_fbx_map(f'{model_ref}_{cc}_{j}_{k}', submesh, model_file, cc, max_vert_used, d2map, nums, mesh, unreal, apply_textures, shaders)
+                        helper_dict[f'{model_ref}_{j}_{k}_{copy_count}_{rand}_'].append([d2map.locations[nums + cc], scipy.spatial.transform.Rotation.from_quat(d2map.rotations[nums + cc]).as_euler('xyz', degrees=True).tolist(), d2map.scales[nums + cc]])
         nums += copy_count
     return helper_dict
 
