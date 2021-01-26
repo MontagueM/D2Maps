@@ -74,7 +74,7 @@ def import_map(file):
 #         s = level.actor_spawn(l)
 
 
-def editor_level_lib(assets, helper):
+def editor_level_lib(assets, helper, start, end):
     # Create new level asset
     unreal.EditorLevelLibrary.new_level('/Game/LevelTest1')
 
@@ -85,16 +85,23 @@ def editor_level_lib(assets, helper):
     #     transforms[name] = t
 
     # Populate with assets
-    for i, a in enumerate(assets):
+    # for i, a in enumerate(assets):
+    for i in range(start, end):
+        a = assets[i]
         name = a.split('.')[0].split('_unreal_')[-1]
-        print(name)
+        # print(name)
+        # if name != '44A5B580_5_0_0':
+        #     continue
         a = unreal.EditorAssetLibrary.load_asset(a)
+        if name not in helper:
+            print(f'Missing file {name}')
+            continue
         r = helper[name][1]
-        r = [-r[0] - 90, r[1] - 180, r[2]]
-        s = unreal.EditorLevelLibrary.spawn_actor_from_object(a, location=[x*100 for x in helper[name][0]], rotation=r)  # l must be UE4 Object
-        # rotation=[-r[0] - 90, r[1] - 180, r[2]]
-        s.set_actor_scale3d([helper[name][2]]*3)
-        # s.add_actor_world_transform(transforms[i])
+        l = helper[name][0]
+        l = [-l[0]*100, l[1]*100, l[2]*100]
+        rotator = unreal.Rotator(r[0], r[1], -r[2])
+        s = unreal.EditorLevelLibrary.spawn_actor_from_object(a, location=l, rotation=rotator)  # l must be UE4 Object
+        s.set_actor_scale3d([helper[name][2]*100]*3)
 
 
 def get_loaded_assets(path):
@@ -107,7 +114,7 @@ if __name__ == '__main__':
 
     # Test data
     map_path = 'I:/maps/city_tower_d2_01ad_fbx/01AD-0681_unreal.fbx'
-    import_map(map_path)
+    # import_map(map_path)
     assets = get_loaded_assets('/Game/LevelTestAssets')
-    print('assets', assets)
-    editor_level_lib(assets, helper)
+    # print('assets', assets)
+    editor_level_lib(assets, helper, start=int(len(assets)/2), end=len(assets))
