@@ -50,12 +50,12 @@ import time
 ue_path = 'C:/Users/monta/Documents/Unreal Projects/PythonMapImports/Content'
 
 
-def import_map(file):
+def import_map(file, target_import_path):
     # The map only needs to consist of materials and all map stuff. There MUST be an index added to these models to help identify what data to use
     task = unreal.AssetImportTask()
     task.set_editor_property('automated', True)
     task.set_editor_property('destination_name', '')
-    task.set_editor_property('destination_path', '/Game/NoCopiesAssets')
+    task.set_editor_property('destination_path', f'/Game/{target_import_path}')
     task.set_editor_property('filename', file)
     task.set_editor_property('replace_existing', True)
     task.set_editor_property('save', True)
@@ -75,9 +75,9 @@ def import_map(file):
 #         s = level.actor_spawn(l)
 
 
-def editor_level_lib(assets, helper, start, end):
+def editor_level_lib(assets, helper, start, end, level_name):
     # Create new level asset
-    unreal.EditorLevelLibrary.new_level('/Game/LevelTest1')
+    unreal.EditorLevelLibrary.new_level(f'/Game/{level_name}')
 
     # Get transforms
     # transforms = {}
@@ -124,15 +124,18 @@ def editor_level_lib(assets, helper, start, end):
 
 
 def get_loaded_assets(path):
-    return [x for x in unreal.EditorAssetLibrary.list_assets(path, recursive=False) if unreal.EditorAssetLibrary.find_asset_data(x).asset_class == 'StaticMesh']
+    return [x for x in unreal.EditorAssetLibrary.list_assets(f'/Game/{path}', recursive=False) if unreal.EditorAssetLibrary.find_asset_data(x).asset_class == 'StaticMesh']
 
 
 if __name__ == '__main__':
     # Read dictionary
-    helper = json.load(open("I:/maps/city_tower_d2_01ad_fbx/01AD-0681_unreal.txt"))
+
+    map_name = 'I:/maps/city_tower_d2_01ad_fbx/01AD-0681' + '_unreal'
+
+    helper = json.load(open(f'{map_name}.txt'))
 
     # Test data
-    map_path = 'I:/maps/city_tower_d2_01ad_fbx/01AD-0681_unreal.fbx'
-    # import_map(map_path)
-    assets = get_loaded_assets('/Game/NoCopiesAssets')
-    editor_level_lib(assets, helper, start=int(len(assets)/2), end=len(assets))
+    map_path = f'{map_name}.fbx'
+    # import_map(map_path, target_import_path='Annex')
+    assets = get_loaded_assets('Annex')
+    editor_level_lib(assets, helper, start=int(3*len(assets)/4), end=int(4*len(assets)/4), level_name='Annex')

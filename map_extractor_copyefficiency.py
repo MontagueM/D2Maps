@@ -235,9 +235,9 @@ def shift_faces_down(faces_data):
 
 def get_shader_info(d2map: Map):
     for material in d2map.material_files:
-        if material.name == '0222-0CAF':
-            print('')
         cbuffer_offsets, texture_offset = met.get_mat_tables(material)
+        if not cbuffer_offsets:
+            continue
         textures = met.get_material_textures(material, texture_offset, hash64_table, all_file_info, custom_dir=f'I:/maps/{d2map.pkg_name}_fbx/textures/')
         met.get_shader_file(material, textures, cbuffer_offsets, all_file_info, custom_dir=f'I:/maps/{d2map.pkg_name}_fbx/shaders/')
 
@@ -421,4 +421,4 @@ if __name__ == '__main__':
     # unpack_folder('edz_021c', unreal=False, shaders=True, apply_textures=False)
     # unpack_location('')
     name = '01AD-0681'
-    unpack_map(name, gf.get_pkg_name(name), unreal=True, shaders=False, apply_textures=False)
+    unpack_map(name, gf.get_pkg_name(name), unreal=True, shaders=True, apply_textures=False)

@@ -666,6 +666,8 @@ def get_shader_info(model_file):
         if material.name == '0222-0CAF':
             print('')
         cbuffer_offsets, texture_offset = get_mat_tables(material)
+        if not cbuffer_offsets:
+            return
         textures = get_material_textures(material, texture_offset, hash64_table, all_file_info, custom_dir=f'I:/static_models/{model_file.uid}/textures/')
         get_shader_file(material, textures, cbuffer_offsets, all_file_info, custom_dir=f'I:/static_models/{model_file.uid}/shaders/')
 
@@ -684,6 +686,8 @@ def apply_shader(model, model_file, submesh: Submesh, node):
 
 
 def get_submesh_textures(model_file: ModelFile, submesh: Submesh, hash64_table, all_file_info, custom_dir=False):
+    if submesh.material.uid == 'FFFFFFFF' or submesh.material.name == 'FBFF-1FFF':
+        return
     submesh.material.get_pkg_name()
     submesh.material.get_fb()
     offset = submesh.material.fb.find(b'\xCF\x6D\x80\x80')
@@ -712,6 +716,8 @@ def get_submesh_textures(model_file: ModelFile, submesh: Submesh, hash64_table, 
 
 
 def get_mat_tables(material):
+    if material.uid == 'FFFFFFFF' or material.name == 'FBFF-1FFF':
+        return None, None
     material.get_pkg_name()
     material.get_fb()
     cbuffers = []
@@ -740,6 +746,8 @@ def get_mat_tables(material):
 
 
 def get_material_textures(material, texture_offset, hash64_table, all_file_info, custom_dir):
+    if material.uid == 'FFFFFFFF' or material.name == 'FBFF-1FFF':
+        return None, None
     material.get_pkg_name()
     material.get_fb()
     texture_offset += 8
@@ -846,4 +854,4 @@ if __name__ == '__main__':
     pkg_db.start_db_connection(f'I:/d2_pkg_db/hash64/{version}.db')
     hash64_table = {x: y for x, y in pkg_db.get_entries_from_table('Everything', 'Hash64, Reference')}
 
-    get_model('DE4DC680')
+    get_model('81A5B580')
