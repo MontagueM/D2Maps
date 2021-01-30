@@ -47,8 +47,6 @@ import unreal
 import json
 import time
 
-ue_path = 'C:/Users/monta/Documents/Unreal Projects/PythonMapImports/Content'
-
 
 def import_map(file, target_import_path):
     # The map only needs to consist of materials and all map stuff. There MUST be an index added to these models to help identify what data to use
@@ -130,12 +128,12 @@ def get_loaded_assets(path):
 if __name__ == '__main__':
     # Read dictionary
 
-    map_name = 'I:/maps/city_tower_d2_01ad_fbx/01AD-0681' + '_unreal'
+    map_name = 'I:/maps/city_tower_d2_02a9_fbx/02A9-1A62' + '_unreal'
 
     helper = json.load(open(f'{map_name}.txt'))
 
     # Test data
     map_path = f'{map_name}.fbx'
-    # import_map(map_path, target_import_path='Annex')
-    assets = get_loaded_assets('Annex')
-    editor_level_lib(assets, helper, start=int(3*len(assets)/4), end=int(4*len(assets)/4), level_name='Annex')
+    # import_map(map_path, target_import_path='Courtyard')
+    assets = get_loaded_assets('Courtyard')
+    editor_level_lib(assets, helper, start=int(7*len(assets)/8), end=int(8*len(assets)/8), level_name='Courtyard')

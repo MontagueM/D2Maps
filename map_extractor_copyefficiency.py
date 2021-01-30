@@ -410,6 +410,7 @@ if __name__ == '__main__':
     # WARNING THIS CURRENTLY DOES NOT OVERWRITE SHADER FILES THAT ARE ALREADY WRITTEN
     pkg_db.start_db_connection(f'I:/d2_pkg_db/hash64/{version}.db')
     hash64_table = {x: y for x, y in pkg_db.get_entries_from_table('Everything', 'Hash64, Reference')}
+    hash64_table['0000000000000000'] = 'FFFFFFFF'
 
     pkg_db.start_db_connection(f'I:/d2_pkg_db/locations/{version}.db')
     loc_table = {y: x for x, y in pkg_db.get_entries_from_table('Everything', 'Hash, String')}
@@ -420,5 +421,5 @@ if __name__ == '__main__':
 
     # unpack_folder('edz_021c', unreal=False, shaders=True, apply_textures=False)
     # unpack_location('')
-    name = '01AD-0681'
+    name = '02A9-1A62'
     unpack_map(name, gf.get_pkg_name(name), unreal=True, shaders=True, apply_textures=False)

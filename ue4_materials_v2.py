@@ -18,7 +18,10 @@ def get_valid_materials_textures():
             continue
 
         matname = unreal.Paths.get_base_filename(asset)
-
+        if 'estack' in matname:
+            continue
+        print(matname)
+        #continue
         # if matname != 'tests':
         #     continue
 
@@ -121,13 +124,14 @@ def recompile_materials():
         mat = unreal.load_asset(game_path + material_path + matname)
         unreal.MaterialEditingLibrary.recompile_material(mat)
 
+
 if __name__ == '__main__':
-    top_path = 'C:/Users/monta/Documents/Unreal Projects/DynamicShaders/Content/'
+    top_path = 'C:/Users/monta/Documents/Unreal Projects/D2Tower/Content/'
 
     game_path = '/Game/'
-    material_path = 'asc_servitor/'
-    texture_path = 'asc_servitor/'
-    shader_path = 'asc_servitor/'
+    material_path = 'Courtyard/'
+    texture_path = '/'
+    shader_path = '/'
     estack_template = game_path + '/Template/EStackTemplate'
     done_usfs = []
     main()

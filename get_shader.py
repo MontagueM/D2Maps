@@ -149,6 +149,8 @@ def get_inputs_append(inputs):
             input_append2 += f'    {inps[3]}.xy = {inps[3]}.xy * tx;\n'
         elif 'SV_isFrontFace0' in inp:
             write = f'\nstatic {inps[2]} {inps[3]} = 1;\n'
+        elif 'SV_POSITION0' in inp:
+            write = f'\nstatic {inps[2]} {inps[3]} = ' + '{1, 1, 1, 1};\n'
         else:
             raise Exception('Input not recognised.')
         input_append1 += write

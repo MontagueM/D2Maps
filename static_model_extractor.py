@@ -144,7 +144,7 @@ def get_model(model_file_hash):
     max_vert_used = 0
     for i, model in enumerate(model_file.models):
         for j, submesh in enumerate(model.submeshes):
-            if submesh.type == 769 or submesh.type == 770 or submesh.type == 778 or submesh.type == 'New':
+            if submesh.type == 769 or submesh.type == 770 or submesh.type == 778 or submesh.type == 'Decal':
                 submesh.faces, max_vert_used = adjust_faces_data(submesh.faces, max_vert_used)
                 submesh.faces = shift_faces_down(submesh.faces)
                 export_fbx(model_file, submesh, f'{model_file_hash}_0_{i}_{j}')
@@ -262,50 +262,52 @@ def get_model_files(model_file: ModelFile):
 
 
 def get_submeshes(model_file: ModelFile):
-    if model_file.new_type:
-        # Assuming we only want a single submesh as of now
+    unk_entries_count = gf.get_uint32(model_file.model_file_fb, 128)
+    unk_entries_offset = 144
+
+    end_offset = unk_entries_offset + unk_entries_count * 6
+    end_place = model_file.model_data_fb[end_offset:].find(b'\xB8\x9F\x80\x80')
+    submesh_entries_count = gf.get_uint16(model_file.model_data_fb, end_offset + end_place + 4)
+    submesh_entries_offset = end_offset + end_place + 20
+    submesh_entries_length = submesh_entries_count * 12
+    submesh_entries_fb = model_file.model_data_fb[submesh_entries_offset:submesh_entries_offset + submesh_entries_length]
+    submesh_entries = [submesh_entries_fb[i:i+12] for i in range(0, len(submesh_entries_fb), 12)]
+
+    actual_submeshes = []
+    for e in submesh_entries:
+        entry = get_header(e, LODSubmeshEntry())
+        actual_submeshes.append(entry)
+
+    # TODO fix this double call
+    relevant_textures = get_materials(model_file)
+
+    for i, e in enumerate(actual_submeshes):
         submesh = Submesh()
-        model = model_file.models[0]
-        offset = model_file.model_file_fb.find(b'\x2F\x6D\x80\x80')+8
-        faces_offset = gf.get_uint32(model_file.model_file_fb, offset+24)
-        faces_length = gf.get_uint32(model_file.model_file_fb, offset+28)
-        submesh.faces = model.faces[int(faces_offset / 3):int((faces_offset + faces_length) / 3)]
+        model = model_file.models[e.SecondIndexRef]
+        submesh.faces = model.faces[int(e.Offset/3):int((e.Offset + e.FacesLength)/3)]
         submesh.pos_verts = trim_verts_data(model.pos_verts, submesh.faces)
         submesh.uv_verts = trim_verts_data(model.uv_verts, submesh.faces)
         submesh.vertex_colour = trim_verts_data(model.vertex_colour, submesh.faces)
-        submesh.type = 'New'
-        model.submeshes.append(submesh)
-    else:
-        unk_entries_count = gf.get_uint32(model_file.model_file_fb, 128)
-        unk_entries_offset = 144
+        submesh.type = e.EntryType
+        if i in relevant_textures.keys():
+            submesh.material = File(name=relevant_textures[i])
+            model.submeshes.append(submesh)
 
-        end_offset = unk_entries_offset + unk_entries_count * 6
-        end_place = model_file.model_data_fb[end_offset:].find(b'\xB8\x9F\x80\x80')
-        submesh_entries_count = gf.get_uint16(model_file.model_data_fb, end_offset + end_place + 4)
-        submesh_entries_offset = end_offset + end_place + 20
-        submesh_entries_length = submesh_entries_count * 12
-        submesh_entries_fb = model_file.model_data_fb[submesh_entries_offset:submesh_entries_offset + submesh_entries_length]
-        submesh_entries = [submesh_entries_fb[i:i+12] for i in range(0, len(submesh_entries_fb), 12)]
-
-        actual_submeshes = []
-        for e in submesh_entries:
-            entry = get_header(e, LODSubmeshEntry())
-            actual_submeshes.append(entry)
-
-        # TODO fix this double call
-        relevant_textures = get_materials(model_file)
-
-        for i, e in enumerate(actual_submeshes):
-            submesh = Submesh()
-            model = model_file.models[e.SecondIndexRef]
-            submesh.faces = model.faces[int(e.Offset/3):int((e.Offset + e.FacesLength)/3)]
-            submesh.pos_verts = trim_verts_data(model.pos_verts, submesh.faces)
-            submesh.uv_verts = trim_verts_data(model.uv_verts, submesh.faces)
-            submesh.vertex_colour = trim_verts_data(model.vertex_colour, submesh.faces)
-            submesh.type = e.EntryType
-            if i in relevant_textures.keys():
-                submesh.material = File(name=relevant_textures[i])
-                model.submeshes.append(submesh)
+    # Decals
+    submesh = Submesh()
+    model = model_file.models[0]
+    offset = model_file.model_file_fb.find(b'\x2F\x6D\x80\x80')+8
+    if offset == 7:
+        return
+    faces_offset = gf.get_uint32(model_file.model_file_fb, offset+24)
+    faces_length = gf.get_uint32(model_file.model_file_fb, offset+28)
+    submesh.faces = model.faces[int(faces_offset / 3):int((faces_offset + faces_length) / 3)]
+    submesh.pos_verts = trim_verts_data(model.pos_verts, submesh.faces)
+    submesh.uv_verts = trim_verts_data(model.uv_verts, submesh.faces)
+    submesh.vertex_colour = trim_verts_data(model.vertex_colour, submesh.faces)
+    submesh.material = File(name=gf.get_file_from_hash(model_file.model_file_fb[offset+0x20:offset+0x24].hex()))
+    submesh.type = 'Decal'
+    model.submeshes.append(submesh)
 
 
 def get_materials(model_file: ModelFile):
@@ -625,12 +627,12 @@ def export_fbx(model_file: ModelFile, submesh: Submesh, name):
     layer = mesh.GetLayer(0)
 
     if submesh.material:
-        # get_submesh_textures(model_file, submesh, hash64_table, all_file_info)
+        get_submesh_textures(model_file, submesh, hash64_table, all_file_info)
         # shaders.get_shader(model_file, submesh, all_file_info, name)
-        apply_shader(model, model_file, submesh, node)
+        # apply_shader(model, model_file, submesh, node)
         print(f'submesh {name} has mat file {submesh.material.name} with textures {submesh.textures}')
         if submesh.diffuse:
-            # apply_diffuse(model, submesh.diffuse, f'I:/static_models/{model_file.uid}/textures/{submesh.diffuse}.png', node)
+            apply_diffuse(model, submesh.diffuse, f'I:/static_models/{model_file.uid}/textures/{submesh.diffuse}.png', node)
             # set_normals(mesh, submesh.diffuse, submesh.norm_verts, layer)
             node.SetShadingMode(fbx.FbxNode.eTextureShading)
 
@@ -643,7 +645,7 @@ def export_fbx(model_file: ModelFile, submesh: Submesh, name):
 
     # Disabled shaders for now
     # if True:
-    get_shader_info(model_file)
+    # get_shader_info(model_file)
 
     model.export(save_path=f'I:/static_models/{model_file.uid}/{name}.fbx', ascii_format=False)
     print('Exported')
@@ -696,7 +698,14 @@ def get_submesh_textures(model_file: ModelFile, submesh: Submesh, hash64_table, 
     if count < 0 or count > 100:
         return
     # image_indices = [gf.get_file_from_hash(submesh.material.fhex[offset+16+8*(2*i):offset+16+8*(2*i)+8]) for i in range(count)]
-    images = [gf.get_file_from_hash(hash64_table[submesh.material.fb[offset+8+0x10+24*i:offset+8+0x10+24*i+8].hex().upper()]) for i in range(count)]
+    if b'\xFF\xFF\xFF\xFF' in submesh.material.fb[offset + 0x10:offset + 0x10 + 24 * count]:  # Uses new texture system
+        images = [x for x in [gf.get_file_from_hash(
+            hash64_table[submesh.material.fb[offset + 8 + 0x10 + 24 * i:offset + 8 + 0x10 + 24 * i + 8].hex().upper()])
+                                        for i in range(count)] if x != 'FBFF-1FFF']
+    else:
+        images = [x for x in [
+            gf.get_file_from_hash(submesh.material.fb[offset + 0x10 + 24 * i:offset + 0x10 + 24 * i + 4].hex().upper())
+            for i in range(count)] if x != 'FBFF-1FFF']
     # _, images = zip(*sorted(zip(image_indices, images)))
     if len(images) == 0:
         return
@@ -853,5 +862,6 @@ if __name__ == '__main__':
 
     pkg_db.start_db_connection(f'I:/d2_pkg_db/hash64/{version}.db')
     hash64_table = {x: y for x, y in pkg_db.get_entries_from_table('Everything', 'Hash64, Reference')}
+    hash64_table['0000000000000000'] = 'FFFFFFFF'
 
-    get_model('81A5B580')
+    get_model('3348D580')
