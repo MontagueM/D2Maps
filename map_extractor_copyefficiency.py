@@ -185,7 +185,7 @@ def compute_coords(d2map: Map, unreal, shaders, apply_textures):
                 mesh = None
                 rand = random.randint(100000, 999999)
                 helper_dict[f'{model_ref}_{j}_{k}_{copy_count}_{rand}_'] = []
-                if submesh.type == 769 or submesh.type == 770 or submesh.type == 778 or submesh.type == 'New':
+                if submesh.type == 769 or submesh.type == 770 or submesh.type == 778 or submesh.type == 'Decal':
                     for cc in range(copy_count):
                         if unreal:
                             if cc == 0:
@@ -422,4 +422,4 @@ if __name__ == '__main__':
     # unpack_folder('edz_021c', unreal=False, shaders=True, apply_textures=False)
     # unpack_location('')
     name = '02A9-1A62'
-    unpack_map(name, gf.get_pkg_name(name), unreal=True, shaders=True, apply_textures=False)
+    unpack_map(name, gf.get_pkg_name(name), unreal=False, shaders=False, apply_textures=False)
