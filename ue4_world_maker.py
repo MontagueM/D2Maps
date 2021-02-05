@@ -57,6 +57,12 @@ def import_map(file, target_import_path):
     task.set_editor_property('filename', file)
     task.set_editor_property('replace_existing', True)
     task.set_editor_property('save', True)
+    task.options = unreal.FbxSceneImportOptionsStaticMesh()
+    task.options.set_editor_property('auto_generate_collision', False)
+    task.options.set_editor_property('build_adjacency_buffer', False)
+    task.options.set_editor_property('build_reversed_index_buffer', False)
+    task.options.set_editor_property('vertex_color_import_option', unreal.FbxSceneVertexColorImportOption.REPLACE)
+
 
     # Run the task
 
@@ -88,9 +94,12 @@ def editor_level_lib(assets, helper, start, end, level_name):
     for i in range(start, end):
         a = assets[i]
         name = a.split('.')[0].split('_unreal_')[-1]
+        if '/' in name:
+            name = name.split('/')[-1]
         s = name.split('_')
         # start_nums = int(s[4])
         copy_count = int(s[3])
+        print(s)
         # name = s[0]
         # name = a.split('.')[0].split('_')[1]
 
@@ -108,9 +117,9 @@ def editor_level_lib(assets, helper, start, end, level_name):
         # if name not in helper:
         #     print(f'Missing file {name}')
         #     continue
-        # print(name)
+        print(name, copy_count)
         for j in range(copy_count):
-            # print(copy_count)
+            print(copy_count)
             r = helper[name][j][1]
             l = helper[name][j][0]
             l = [-l[0]*100, l[1]*100, l[2]*100]
@@ -128,12 +137,13 @@ def get_loaded_assets(path):
 if __name__ == '__main__':
     # Read dictionary
 
-    map_name = 'I:/maps/city_tower_d2_02a9_fbx/02A9-1A62' + '_unreal'
+    map_name = 'I:/maps/dreaming_city_0176_fbx/0176-0E38' + '_unreal'
+    #map_name = 'I:/maps/city_tower_d2_02aa_fbx/02AA-1A83' + '_unreal'
 
     helper = json.load(open(f'{map_name}.txt'))
 
     # Test data
     map_path = f'{map_name}.fbx'
-    # import_map(map_path, target_import_path='Courtyard')
-    assets = get_loaded_assets('Courtyard')
-    editor_level_lib(assets, helper, start=int(7*len(assets)/8), end=int(8*len(assets)/8), level_name='Courtyard')
+    # import_map(map_path, target_import_path='dreaming_0176_0E38')
+    assets = get_loaded_assets('dreaming_0176_0E38')
+    editor_level_lib(assets, helper, start=int(0*len(assets)/8), end=int(8*len(assets)/8), level_name='dreaming_0176_0e38')

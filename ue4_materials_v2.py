@@ -18,14 +18,15 @@ def get_valid_materials_textures():
             continue
 
         matname = unreal.Paths.get_base_filename(asset)
-        if 'estack' in matname:
-            continue
+        # if 'estack' in matname:
+        #     continue
         print(matname)
         #continue
         # if matname != 'tests':
         #     continue
 
-        usf = asset.split('.')[-1].split('_')[0] + '_o0.usf'
+        usf = asset.split('.')[-1].split('_')[0] + '.usf'
+        print(usf)
         if 'FBFF' in usf:
             continue
         try:
@@ -67,18 +68,19 @@ def modify_new_materials(mats_texs):
                     # Modifying the custom expression node
                     desc = x.get_editor_property('desc')
                     if 'RT' in desc:
-                        code = '#include "' + top_path + shader_path + '/shaders/' + material.split('_estack')[0] + '_o' + desc[2] + '.usf"\nreturn 0;'
+                        code = '#include "' + top_path + shader_path + '/shaders/' + material.split('_estack')[0].split('_')[0] + '.usf"\n//return 0;'
                         inputs = []
+                        ci = unreal.CustomInput()
+                        ci.set_editor_property('input_name', 'tx')
+                        inputs.append(ci)
+                        # TODO change this enumeration to an index as doesnt always start at zero
                         for i in range(len(mats_texs[material])):
                             ci = unreal.CustomInput()
                             ci.set_editor_property('input_name', 't' + str(i))
                             inputs.append(ci)
-                        ci = unreal.CustomInput()
-                        ci.set_editor_property('input_name', 'tx')
-                        inputs.append(ci)
                         x.set_editor_property('code', code)
                         x.set_editor_property('inputs', inputs)
-                        x.set_editor_property('output_type', unreal.CustomMaterialOutputType.CMOT_FLOAT4)
+                        x.set_editor_property('output_type', unreal.CustomMaterialOutputType.CMOT_MATERIAL_ATTRIBUTES)
 
                     # Adding texture links
 
@@ -87,7 +89,7 @@ def modify_new_materials(mats_texs):
                     # mat.Expressions = [cust_expr]
                     texcoord = unreal.MaterialEditingLibrary.create_material_expression(mat,
                                                                                         unreal.MaterialExpressionTextureCoordinate,
-                                                                                        -3000, -1000)
+                                                                                        -1000, -700)
                     unreal.MaterialEditingLibrary.connect_material_expressions(texcoord, '', x, 'tx')
 
 
@@ -99,7 +101,7 @@ def add_tex_samples(mat, texs):
     for i, tex in enumerate(texs):
         texsample = unreal.MaterialEditingLibrary.create_material_expression(mat,
                                                                              unreal.MaterialExpressionTextureSample,
-                                                                             -3000, -700 + 300 * i)
+                                                                             -1000, -500 + 250 * i)
         ts_TextureName = unreal.Paths.get_base_filename(tex + '.png')
         ts_TextureUePath = game_path + texture_path + '/Textures/' + ts_TextureName
         ts_LoadedTexture = unreal.EditorAssetLibrary.load_asset(ts_TextureUePath)
@@ -126,13 +128,16 @@ def recompile_materials():
 
 
 if __name__ == '__main__':
-    top_path = 'C:/Users/monta/Documents/Unreal Projects/D2Tower/Content/'
+    # top_path = 'C:/Users/monta/Documents/Unreal Projects/D2Tower/Content/'
+    top_path = 'C:/Users/monta/Documents/Unreal Projects/DynamicShaders/Content/'
+    # top_path = 'C:/Users/monta/Documents/Unreal Projects/MapTests/Content/'
+
 
     game_path = '/Game/'
-    material_path = 'Courtyard/'
-    texture_path = '/'
-    shader_path = '/'
+    material_path = 'dreaming_0176_0E38/'  # Double slash crashes so do not have / at beginning here
+    texture_path = 'dreaming_0176_0E38/'
+    shader_path = 'dreaming_0176_0E38/'
     estack_template = game_path + '/Template/EStackTemplate'
     done_usfs = []
     main()
-    # recompile_materials()
+    #recompile_materials()

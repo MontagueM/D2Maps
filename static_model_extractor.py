@@ -756,20 +756,20 @@ def get_mat_tables(material):
 
 def get_material_textures(material, texture_offset, hash64_table, all_file_info, custom_dir):
     if material.uid == 'FFFFFFFF' or material.name == 'FBFF-1FFF':
-        return None, None
+        return [], []
     material.get_pkg_name()
     material.get_fb()
     texture_offset += 8
     if texture_offset == 15:
-        return []
+        return [], []
     count = gf.get_uint32(material.fb, texture_offset-8)
     # Arbritrary
     if count < 0 or count > 100:
-        return []
-    # image_indices = [gf.get_file_from_hash(material.fhex[texture_offset+16+8*(2*i):texture_offset+16+8*(2*i)+8]) for i in range(count)]
+        return [], []
+    image_indices = [material.fb[texture_offset+8+24*i] for i in range(count)]
     images = [gf.get_file_from_hash(hash64_table[material.fb[texture_offset+8+0x10+24*i:texture_offset+8+0x10+24*i+8].hex().upper()]) for i in range(count)]
     if len(images) == 0:
-        return []
+        return [], []
     for img in images:
         if custom_dir:
             gf.mkdir(f'{custom_dir}/')
@@ -781,11 +781,11 @@ def get_material_textures(material, texture_offset, hash64_table, all_file_info,
         #     gf.mkdir(f'C:/d2_model_temp/texture_models/{model_file.uid}/textures/')
         #     if not os.path.exists(f'C:/d2_model_temp/texture_models/{model_file.uid}/textures/{img}.png'):
         #         imager.get_image_from_file(f'I:/d2_output_3_0_0_2/{gf.get_pkg_name(img)}/{img}.bin', f'C:/d2_model_temp/texture_models/{model_file.uid}/textures/')
-    return images
+    return images, image_indices
 
 
-def get_shader_file(material, textures, cbuffer_offsets, all_file_info, custom_dir):
-    shaders.get_shader_from_mat(material, textures, cbuffer_offsets, all_file_info, custom_dir)
+def get_shader_file(material, textures, indices, cbuffer_offsets, all_file_info, custom_dir):
+    shaders.get_shader_from_mat(material, textures, indices, cbuffer_offsets, all_file_info, custom_dir)
 
 
 def create_mesh(fbx_map, pos_verts_data, faces_data, name):
@@ -864,4 +864,4 @@ if __name__ == '__main__':
     hash64_table = {x: y for x, y in pkg_db.get_entries_from_table('Everything', 'Hash64, Reference')}
     hash64_table['0000000000000000'] = 'FFFFFFFF'
 
-    get_model('3348D580')
+    get_model('74D4D680')

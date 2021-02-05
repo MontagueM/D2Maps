@@ -8,6 +8,7 @@ import re
 
 
 def get_shader(model_file, submesh, all_file_info, name):
+    raise Exception('No')
     shader = met.File(uid=submesh.material.fb[0x298:0x298 + 4].hex())
     shader.get_file_from_uid()
     shader_ref = f"{all_file_info[shader.name]['RefPKG'][2:]}-{all_file_info[shader.name]['RefID'][2:]}"
@@ -15,7 +16,7 @@ def get_shader(model_file, submesh, all_file_info, name):
     convert_hlsl(submesh.material, submesh.textures, [], shader_ref, model_file.uid, all_file_info, name)
 
 
-def get_shader_from_mat(material, textures, cbuffer_offsets, all_file_info, custom_dir):
+def get_shader_from_mat(material, textures, indices, cbuffer_offsets, all_file_info, custom_dir):
     # Overwrite
     gf.mkdir(custom_dir)
     # if material.name + '_o0.usf' in os.listdir(custom_dir):
@@ -24,7 +25,7 @@ def get_shader_from_mat(material, textures, cbuffer_offsets, all_file_info, cust
     shader.get_file_from_uid()
     shader_ref = f"{all_file_info[shader.name]['RefPKG'][2:]}-{all_file_info[shader.name]['RefID'][2:]}"
     get_decompiled_hlsl(shader_ref, custom_dir)
-    convert_hlsl(material, textures, cbuffer_offsets, shader_ref, custom_dir, all_file_info)
+    convert_hlsl(material, textures, indices, cbuffer_offsets, shader_ref, custom_dir, all_file_info)
 
 
 def get_decompiled_hlsl(shader_ref, custom_dir):
@@ -36,14 +37,19 @@ def get_decompiled_hlsl(shader_ref, custom_dir):
     num = len(os.listdir(f'I:/d2_output_3_0_2_0/{pkg_name}/'))
     while True:
         if num != len(os.listdir(f'I:/d2_output_3_0_2_0/{pkg_name}/')):
-            time.sleep(0.1)
+            time.sleep(0.2)
             break
 
-    shutil.move(f'I:/d2_output_3_0_2_0/{pkg_name}/{shader_ref}.hlsl', f'{custom_dir}/{shader_ref}.hlsl')
+    while True:
+        try:
+            shutil.move(f'I:/d2_output_3_0_2_0/{pkg_name}/{shader_ref}.hlsl', f'{custom_dir}/{shader_ref}.hlsl')
+            break
+        except PermissionError:
+            pass
     print(f'Decompiled and moved shader {shader_ref}.hlsl')
 
 
-def convert_hlsl(material, textures, cbuffer_offsets, shader_ref, custom_dir, all_file_info, name=None):
+def convert_hlsl(material, textures, indices, cbuffer_offsets, shader_ref, custom_dir, all_file_info, name=None):
     print(f'Material {material.name}')
     lines_to_write = []
 
@@ -60,13 +66,13 @@ def convert_hlsl(material, textures, cbuffer_offsets, shader_ref, custom_dir, al
         input_append1, input_append2 = get_inputs_append(inputs)
         texs = get_texs(text)
         params, params_end = get_params(texs)
-        tex_comments = get_tex_comments(textures)
+        tex_comments = get_tex_comments(textures, indices)
         lines_to_write.append('#pragma once\n')
         lines_to_write.append(tex_comments)
         lines_to_write.append(cbuffer_text)
         # lines_to_write.append(f'static float4 cb0[{cbuffer_length}] = \n' + '{\n' + f'{cbuffer1}\n' + '};\n')
         lines_to_write.append(input_append1)
-        lines_to_write.append('\n\nstruct shader {\nfloat4 main(\n')
+        lines_to_write.append('\n\nstruct shader {\nFMaterialAttributes main(\n')
         lines_to_write.append(params)
         lines_to_write.append(input_append2)
         lines_to_write.append(f'    float4 {",".join(outputs)};\n')
@@ -74,20 +80,39 @@ def convert_hlsl(material, textures, cbuffer_offsets, shader_ref, custom_dir, al
         lines_to_write.append('}\n};\n\nshader s;\n\n' + f'return s.main({params_end}, tx);')
 
     # Change to 3 for all outputs, currently just want base colour
-    for i in range(3):
-        if name:
-            open_dir = f'{custom_dir}/{name}_{shader_ref}_o{i}.usf'
-        else:
-            open_dir = f'{custom_dir}/{material.name}_o{i}.usf'
-        with open(open_dir, 'w') as u:
-        # with open(f'hlsl/.usf', 'w') as u:
-            # TODO convert to an array write, faster
-            for line in lines_to_write:
-                if 'return' in line:
-                    line = line.replace('return;', f'return o{i};')
-                u.write(line)
-            print(f'Wrote to usf {open_dir}')
-        print('')
+    # for i in range(3):
+    if name:
+        open_dir = f'{custom_dir}/{name}_{shader_ref}.usf'
+    else:
+        open_dir = f'{custom_dir}/{material.name}.usf'
+    with open(open_dir, 'w') as u:
+        for line in lines_to_write:
+            if 'return' in line:
+                new_line = """MA.BaseColor = o0.xyz;
+            MA.Metallic = o2.x;
+            MA.Roughness = 1 - (o1.z-0.75)*4;
+            MA.OpacityMask = o0.w;
+            // Emissive Color
+            if (o2.y <= 0.5 || o2.y == 0) {
+                MA.EmissiveColor = 0;
+            } else {
+                MA.EmissiveColor = 23.5*exp(2*(o2.y-0.5));
+            }
+            // Texture AO
+            if (o2.y <= 0.5 || o2.y == 0) {
+                MA.AmbientOcclusion = o2.y*2;
+            } else {
+                MA.AmbientOcclusion = 1;
+            }
+            float3 zero = {0, 0, 0};
+            MA.Normal = zero;
+            MA.Specular = zero;
+            return MA;
+                """.replace('            ', '    ')
+                line = line.replace('return;', new_line)
+            u.write(line)
+        print(f'Wrote to usf {open_dir}')
+    print('')
 
 
 def get_cbuffer_text(cbuffers, text):
@@ -128,25 +153,27 @@ def get_cbuffer_text(cbuffers, text):
     return ret
 
 
-def get_tex_comments(textures):
+def get_tex_comments(textures, indices):
     comments = ''
     comments += f'//{textures}\n'
     for i, t in enumerate(textures):
-        comments += f'// t{i} is {t}\n'
+        comments += f'// t{indices[i]} is {t}\n'
     return comments
 
 
 def get_inputs_append(inputs):
     input_append1 = ''
-    input_append2 = ''
+    input_append2 = '    FMaterialAttributes MA;\n'
     for inp in inputs:
         inps = inp.split(' ')
         if 'TEXCOORD' in inp:
+            input_append2 += f'    {inps[3]}.xy = {inps[3]}.xy * tx;\n'
             if 'float4' in inp:
                 write = f'\nstatic {inps[2]} {inps[3]} = ' + '{1, 1, 1, 1};\n'
+                input_append2 += f'    {inps[3]}.zw = {inps[3]}.zw * tx;\n'
             elif 'float3' in inp:
                 write = f'\nstatic {inps[2]} {inps[3]} = ' + '{1, 1, 1};\n'
-            input_append2 += f'    {inps[3]}.xy = {inps[3]}.xy * tx;\n'
+                input_append2 += f'    {inps[3]}.z = {inps[3]}.z * tx[0];\n'
         elif 'SV_isFrontFace0' in inp:
             write = f'\nstatic {inps[2]} {inps[3]} = 1;\n'
         elif 'SV_POSITION0' in inp:
@@ -184,6 +211,16 @@ def get_instructions(text):
     instructions = []
     care = False
     read = False
+    min_sample = 999
+
+    # Identifying smallest Sample number
+    for line in text:
+        if 'Sample(s' in line:
+            to_sample = int([x for x in line.split(' ') if x != ''][2].split('.')[0][1:])
+            if to_sample < min_sample:
+                min_sample = to_sample
+
+    # TODO: We might have to change it so the numeration of samples is in order, with no gaps.
     for line in text:
         if read:
             if 'Sample' in line:
@@ -192,17 +229,20 @@ def get_instructions(text):
                 samplestate = int(line.split('(')[1][1])
                 uv = line.split(', ')[1].split(')')[0]
                 dot_after = line.split(').')[1]
-                line = f'{equal}= Material_Texture2D_{to_sample[1:]}.SampleLevel(Material_Texture2D_{samplestate-1}Sampler, {uv}, 0).{dot_after}'
+                line = f'{equal}= Material_Texture2D_{int(to_sample[1:])-min_sample}.SampleLevel(Material_Texture2D_{samplestate-1}Sampler, {uv}, 0).{dot_after}'
             elif 'LevelOfDetail' in line:
                 equal = line.split('=')[0]
                 line = f'{equal}= 0;'
+            if 'o0.w = ' in line:
+                # Fixing iridescence causing alpha issues
+                line = 'o0.w = 2;\n'
             instructions.append('  ' + line)
             if 'return;' in line:
                 ret = ''.join(instructions)
                 # cmp seems broken
                 ret = ret.replace('cmp', '')
                 # discard doesnt work in ue4 hlsl
-                ret = ret.replace('discard', '{ o0.w = 1; return o0; }')
+                ret = ret.replace('discard', '{ MA.OpacityMask = 0; return MA; }')
                 # just in case theres some stupid other texture calls
                 return ret
         elif 'void main(' in line:
@@ -264,6 +304,3 @@ def process_cbuffer_data(fb):
         cbuffer_out.append(f'   float4({cbuffer[i]}, {cbuffer[i + 1]}, {cbuffer[i + 2]}, {cbuffer[i + 3]}),')
     return '\n'.join(cbuffer_out), int(len(cbuffer) / 4)
 
-
-if __name__ == '__main__':
-    convert_hlsl(material, textures, cbuffer_offsets, shader_ref, custom_dir, all_file_info)
