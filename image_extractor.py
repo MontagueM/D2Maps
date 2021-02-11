@@ -243,7 +243,7 @@ def get_image_from_file(file_path, all_file_info, save_path=None):
     ref_pkg = gf.get_pkg_name(ref_file)
     if all_file_info[file_name]['FileType'] == 'Texture Header':
         header_hex = gf.get_hex_data(file_path)
-        data_hex = gf.get_hex_data(f'I:/d2_output_3_0_2_0/{ref_pkg}/{ref_file}.bin')
+        data_hex = gf.get_hex_data(f'I:/d2_output_3_1_0_0/{ref_pkg}/{ref_file}.bin')
     elif all_file_info[file_name]['FileType'] == 'Texture Data':
         print('Only pass through header please, cba to fix this.')
         return
@@ -258,7 +258,7 @@ def get_image_from_file(file_path, all_file_info, save_path=None):
     if large_tex_hash != 'FFFFFFFF':
         large_file = gf.get_file_from_hash(large_tex_hash)
         pkg_name = gf.get_pkg_name(large_file)
-        data_hex = gf.get_hex_data(f'I:/d2_output_3_0_2_0/{pkg_name}/{large_file}.bin')
+        data_hex = gf.get_hex_data(f'I:/d2_output_3_1_0_0/{pkg_name}/{large_file}.bin')
     print(ref_file)
     img = get_image_from_data(header, dimensions, data_hex)
     if img:

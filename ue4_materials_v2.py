@@ -128,15 +128,17 @@ def recompile_materials():
 
 
 if __name__ == '__main__':
-    # top_path = 'C:/Users/monta/Documents/Unreal Projects/D2Tower/Content/'
-    top_path = 'C:/Users/monta/Documents/Unreal Projects/DynamicShaders/Content/'
+    top_path = 'C:/Users/monta/Documents/Unreal Projects/D2Tower/Content/'
+    # top_path = 'C:/Users/monta/Documents/Unreal Projects/DynamicShaders/Content/'
     # top_path = 'C:/Users/monta/Documents/Unreal Projects/MapTests/Content/'
+    # top_path = 'C:/Users/monta/Documents/Unreal Projects/Maps/Content/'
+
 
 
     game_path = '/Game/'
-    material_path = 'dreaming_0176_0E38/'  # Double slash crashes so do not have / at beginning here
-    texture_path = 'dreaming_0176_0E38/'
-    shader_path = 'dreaming_0176_0E38/'
+    material_path = 'HELM/'  # Double slash crashes so do not have / at beginning here
+    texture_path = 'HELM/'
+    shader_path = 'HELM/'
     estack_template = game_path + '/Template/EStackTemplate'
     done_usfs = []
     main()

@@ -33,16 +33,16 @@ def get_decompiled_hlsl(shader_ref, custom_dir):
     pkg_name = gf.get_pkg_name(shader_ref)
 
 
-    os.system(f'start hlsl/decomp.exe -D I:/d2_output_3_0_2_0/{pkg_name}/{shader_ref}.bin')
-    num = len(os.listdir(f'I:/d2_output_3_0_2_0/{pkg_name}/'))
+    os.system(f'start hlsl/decomp.exe -D I:/d2_output_3_1_0_0/{pkg_name}/{shader_ref}.bin')
+    num = len(os.listdir(f'I:/d2_output_3_1_0_0/{pkg_name}/'))
     while True:
-        if num != len(os.listdir(f'I:/d2_output_3_0_2_0/{pkg_name}/')):
+        if num != len(os.listdir(f'I:/d2_output_3_1_0_0/{pkg_name}/')):
             time.sleep(0.2)
             break
 
     while True:
         try:
-            shutil.move(f'I:/d2_output_3_0_2_0/{pkg_name}/{shader_ref}.hlsl', f'{custom_dir}/{shader_ref}.hlsl')
+            shutil.move(f'I:/d2_output_3_1_0_0/{pkg_name}/{shader_ref}.hlsl', f'{custom_dir}/{shader_ref}.hlsl')
             break
         except PermissionError:
             pass
@@ -106,7 +106,7 @@ def convert_hlsl(material, textures, indices, cbuffer_offsets, shader_ref, custo
             }
             float3 zero = {0, 0, 0};
             MA.Normal = zero;
-            MA.Specular = zero;
+            MA.Specular = 0;
             return MA;
                 """.replace('            ', '    ')
                 line = line.replace('return;', new_line)

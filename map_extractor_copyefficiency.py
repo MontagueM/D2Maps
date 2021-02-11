@@ -85,10 +85,10 @@ def write_helper_txt(d2map: Map, helper_dict, pkg_name):
 
 
 def get_fb_from_pkg(d2map: Map):
-    main_fb = open(f'I:/d2_output_3_0_2_0/{d2map.get_pkg_name()}/{d2map.name}.bin', 'rb').read()
+    main_fb = open(f'I:/d2_output_3_1_0_0/{d2map.get_pkg_name()}/{d2map.name}.bin', 'rb').read()
     # file_hash = main_fb[24:24+4]
     # scales_file = met.File(name=gf.get_file_from_hash(file_hash.hex()))
-    # d2map.scales_fb = open(f'I:/d2_output_3_0_2_0/{scales_file.get_pkg_name()}/{scales_file.name}.bin', 'rb').read()[48:]
+    # d2map.scales_fb = open(f'I:/d2_output_3_1_0_0/{scales_file.get_pkg_name()}/{scales_file.name}.bin', 'rb').read()[48:]
 
     transform_count = gf.get_uint32(main_fb, 64)
     transform_offset = int(main_fb.find(b'\x40\x6D\x80\x80')+8)
@@ -238,8 +238,8 @@ def get_shader_info(d2map: Map):
         cbuffer_offsets, texture_offset = met.get_mat_tables(material)
         if not cbuffer_offsets:
             continue
-        textures = met.get_material_textures(material, texture_offset, hash64_table, all_file_info, custom_dir=f'I:/maps/{d2map.pkg_name}_fbx/textures/')
-        met.get_shader_file(material, textures, cbuffer_offsets, all_file_info, custom_dir=f'I:/maps/{d2map.pkg_name}_fbx/shaders/')
+        textures, indices = met.get_material_textures(material, texture_offset, hash64_table, all_file_info, custom_dir=f'I:/maps/{d2map.pkg_name}_fbx/textures/')
+        met.get_shader_file(material, textures, indices, cbuffer_offsets, all_file_info, custom_dir=f'I:/maps/{d2map.pkg_name}_fbx/shaders/')
 
 
 def add_model_to_fbx_map(name, submesh: met.Submesh, model_file, cc, max_vert_used, d2map, nums, mesh, unreal, apply_textures, shaders):
@@ -399,14 +399,14 @@ def unpack_folder(pkg_name, unreal, shaders, apply_textures):
             # a = [x.split('.')[0] for x in os.listdir('C:\d2_maps/orphaned_0932_fbx/')]
             # if file_name in [x.split('.')[0] for x in os.listdir(f'C:\d2_maps/{pkg_name}_fbx/')]:
             #     continue
-            if '16B9' not in file_name:
-                continue
+            # if '16B9' not in file_name:
+            #     continue
             print(f'Unpacking {file_name}')
             unpack_map(file_name, pkg_name, unreal, shaders, apply_textures)
 
 
 if __name__ == '__main__':
-    version = '3_0_2_0'
+    version = '3_1_0_0'
     # WARNING THIS CURRENTLY DOES NOT OVERWRITE SHADER FILES THAT ARE ALREADY WRITTEN
     pkg_db.start_db_connection(f'I:/d2_pkg_db/hash64/{version}.db')
     hash64_table = {x: y for x, y in pkg_db.get_entries_from_table('Everything', 'Hash64, Reference')}
@@ -419,7 +419,8 @@ if __name__ == '__main__':
     all_file_info = {x[0]: dict(zip(['RefID', 'RefPKG', 'FileType'], x[1:])) for x in
                      pkg_db.get_entries_from_table('Everything', 'FileName, RefID, RefPKG, FileType')}
 
-    # unpack_folder('edz_021c', unreal=False, shaders=True, apply_textures=False)
+    # unpack_folder('sr_cinematics_02ee', unreal=False, shaders=False, apply_textures=False)
     # unpack_location('')
-    name = '02A9-1A62'
+
+    name = '0218-00AE'
     unpack_map(name, gf.get_pkg_name(name), unreal=False, shaders=False, apply_textures=False)

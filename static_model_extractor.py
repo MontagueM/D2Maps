@@ -48,7 +48,7 @@ class File:
         return self.pkg_name
 
     def get_fb(self):
-        self.fb = open(f'I:/d2_output_3_0_2_0/{self.pkg_name}/{self.name}.bin', 'rb').read()
+        self.fb = open(f'I:/d2_output_3_1_0_0/{self.pkg_name}/{self.name}.bin', 'rb').read()
 
 
 class ModelFile(File):
@@ -68,7 +68,7 @@ class ModelFile(File):
         if not pkg_name:
             return None
             # raise RuntimeError('Invalid model file given')
-        self.model_file_fb = open(f'I:/d2_output_3_0_2_0/{pkg_name}/{self.name}.bin', 'rb').read()
+        self.model_file_fb = open(f'I:/d2_output_3_1_0_0/{pkg_name}/{self.name}.bin', 'rb').read()
         model_data_hash = self.model_file_fb[8:12]
         return gf.get_file_from_hash(model_data_hash.hex())
 
@@ -113,7 +113,7 @@ class HeaderFile(File):
             if not self.name:
                 self.name = gf.get_file_from_hash(self.uid)
             pkg_name = gf.get_pkg_name(self.name)
-            header_fb = open(f'I:/d2_output_3_0_2_0/{pkg_name}/{self.name}.bin', 'rb').read()
+            header_fb = open(f'I:/d2_output_3_1_0_0/{pkg_name}/{self.name}.bin', 'rb').read()
             self.header = get_header(header_fb, Stride12Header())
             return self.header
 
@@ -172,7 +172,7 @@ def get_model_data(model_file: ModelFile, all_file_info):
 
 def get_vert_colour(vc_file, all_file_info):
     vc_ref = f"{all_file_info[vc_file.name]['RefPKG'][2:]}-{all_file_info[vc_file.name]['RefID'][2:]}"
-    fb = open(f'I:/d2_output_3_0_2_0/{gf.get_pkg_name(vc_ref)}/{vc_ref}.bin', 'rb').read()
+    fb = open(f'I:/d2_output_3_1_0_0/{gf.get_pkg_name(vc_ref)}/{vc_ref}.bin', 'rb').read()
 
     vert_colours = []
     for i in range(0, len(fb), 4):
@@ -190,7 +190,7 @@ def get_model_files(model_file: ModelFile):
         print('NEW TYPEa')
         return
     model_file.model_data_file.get_pkg_name()
-    model_file.model_data_fb = open(f'I:/d2_output_3_0_2_0/{model_file.model_data_file.pkg_name}/{model_file.model_data_file.name}.bin', 'rb').read()
+    model_file.model_data_fb = open(f'I:/d2_output_3_1_0_0/{model_file.model_data_file.pkg_name}/{model_file.model_data_file.name}.bin', 'rb').read()
     split_fb = model_file.model_data_fb.split(b'\xB8\x9F\x80\x80')[-1]
     model_count = gf.get_uint16(split_fb, 0)
     relevant_fb = split_fb[16:]
@@ -391,7 +391,7 @@ def get_faces_data(faces_file, all_file_info):
     ref_file_type = all_file_info[ref_file]['FileType']
     faces = []
     if ref_file_type == "Faces Data":
-        faces_fb = open(f'I:/d2_output_3_0_2_0/{ref_pkg_name}/{ref_file}.bin', 'rb').read()
+        faces_fb = open(f'I:/d2_output_3_1_0_0/{ref_pkg_name}/{ref_file}.bin', 'rb').read()
         int_faces_data = [gf.get_uint16(faces_fb, i)+1 for i in range(0, len(faces_fb), 2)]
         for i in range(0, len(int_faces_data), 3):
             face = []
@@ -424,7 +424,7 @@ def get_verts_data(verts_file, all_file_info, is_uv):
     if ref_file_type == "Vertex Data":
         stride_header = verts_file.header
 
-        stride_fb = open(f'I:/d2_output_3_0_2_0/{ref_pkg_name}/{ref_file}.bin', 'rb').read()
+        stride_fb = open(f'I:/d2_output_3_1_0_0/{ref_pkg_name}/{ref_file}.bin', 'rb').read()
 
         fb_data_split = [stride_fb[i:i + stride_header.StrideLength] for i in
                           range(0, len(stride_fb), stride_header.StrideLength)]
@@ -717,11 +717,11 @@ def get_submesh_textures(model_file: ModelFile, submesh: Submesh, hash64_table, 
             if not os.path.exists(f'{custom_dir}/{img}.png'):
                 if img == 'FBFF-1FFF':
                     continue
-                imager.get_image_from_file(f'I:/d2_output_3_0_2_0/{gf.get_pkg_name(img)}/{img}.bin', all_file_info, f'{custom_dir}/')
+                imager.get_image_from_file(f'I:/d2_output_3_1_0_0/{gf.get_pkg_name(img)}/{img}.bin', all_file_info, f'{custom_dir}/')
         else:
             gf.mkdir(f'I:/static_models/{model_file.uid}/textures/')
             if not os.path.exists(f'I:/static_models/{model_file.uid}/textures/{img}.png'):
-                imager.get_image_from_file(f'I:/d2_output_3_0_2_0/{gf.get_pkg_name(img)}/{img}.bin', all_file_info, f'I:/static_models/{model_file.uid}/textures/')
+                imager.get_image_from_file(f'I:/d2_output_3_1_0_0/{gf.get_pkg_name(img)}/{img}.bin', all_file_info, f'I:/static_models/{model_file.uid}/textures/')
 
 
 def get_mat_tables(material):
@@ -776,7 +776,7 @@ def get_material_textures(material, texture_offset, hash64_table, all_file_info,
             if not os.path.exists(f'{custom_dir}/{img}.png'):
                 if img == 'FBFF-1FFF':
                     continue
-                imager.get_image_from_file(f'I:/d2_output_3_0_2_0/{gf.get_pkg_name(img)}/{img}.bin', all_file_info, f'{custom_dir}/')
+                imager.get_image_from_file(f'I:/d2_output_3_1_0_0/{gf.get_pkg_name(img)}/{img}.bin', all_file_info, f'{custom_dir}/')
         # else:
         #     gf.mkdir(f'C:/d2_model_temp/texture_models/{model_file.uid}/textures/')
         #     if not os.path.exists(f'C:/d2_model_temp/texture_models/{model_file.uid}/textures/{img}.png'):
@@ -854,7 +854,7 @@ def create_uv(mesh, name, uv_verts_data, layer):
 
 
 if __name__ == '__main__':
-    version = '3_0_2_0'
+    version = '3_1_0_0'
 
     pkg_db.start_db_connection(f'I:/d2_pkg_db/{version}.db')
     all_file_info = {x[0]: dict(zip(['RefID', 'RefPKG', 'FileType'], x[1:])) for x in
@@ -864,4 +864,4 @@ if __name__ == '__main__':
     hash64_table = {x: y for x, y in pkg_db.get_entries_from_table('Everything', 'Hash64, Reference')}
     hash64_table['0000000000000000'] = 'FFFFFFFF'
 
-    get_model('74D4D680')
+    get_model('0851DC80')
