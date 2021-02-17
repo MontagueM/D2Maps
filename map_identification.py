@@ -8,6 +8,14 @@ def from_location_bubble(bubble_name):
         raise KeyError('Bubble is not in the location table')
     print(f'Map files related to {bubble_name}:')
     bubble_file = gf.get_file_from_hash(loc_table[bubble_name])
+    get_bubble(bubble_file)
+
+
+def from_text_string():
+    pass
+
+
+def get_bubble(bubble_file):
     fb = open(f'I:/d2_output_3_1_0_0/{gf.get_pkg_name(bubble_file)}/{bubble_file}.bin', 'rb').read()
     lower_file = gf.get_file_from_hash(fb[0x8:0xC].hex())
     fb = open(f'I:/d2_output_3_1_0_0/{gf.get_pkg_name(lower_file)}/{lower_file}.bin', 'rb').read()
@@ -29,10 +37,6 @@ def from_location_bubble(bubble_name):
         flt = [struct.unpack('f', fb[0x80+4*i:0x80+4*(i+1)])[0] for i in range(3)]
 
         print(x, map_file, len(fb), f'xyz {flt}')
-
-
-def from_text_string():
-    pass
 
 
 def from_class_1E898080(class_array):
@@ -59,4 +63,5 @@ if __name__ == '__main__':
     all_file_info = {x[0]: dict(zip(['Reference', 'FileType'], x[1:])) for x in
                      pkg_db.get_entries_from_table('Everything', 'FileName, Reference, FileType')}
 
-    from_location_bubble('bubble|edz|cargo')
+    from_location_bubble('bubble|tangled_shore|plains')
+    # get_bubble('0215-0B5B')

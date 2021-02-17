@@ -360,7 +360,7 @@ def scale_and_repos_pos_verts(verts_data, model_file):
     position_shift = [struct.unpack('f', model_file.model_data_fb[80 + 4 * i:80 + 4 * (i + 1)])[0] for i in range(3)]
     for i in range(3):
         for j in range(len(verts_data)):
-            verts_data[j][i] -= (scale - position_shift[i])
+            verts_data[j][i] += position_shift[i]
     return verts_data
 
 
@@ -373,13 +373,8 @@ def scale_and_repos_uv_verts(verts_data, model_file):
         verts_data[i][1] *= -scales[1]
 
     for j in range(len(verts_data)):
-        verts_data[j][0] -= (scales[0] - position_shifts[0])
-        verts_data[j][1] += (scales[1] - position_shifts[1] + 1)
-
-    # flip uv tests
-
-    # for j in range(len(verts_data)):
-    #     verts_data[j] = verts_data[j][::-1]
+        verts_data[j][0] += position_shifts[0]
+        verts_data[j][1] -= position_shifts[1] - 1
 
     return verts_data
 
@@ -406,7 +401,7 @@ def get_faces_data(faces_file, all_file_info):
 
 def get_float16(fb, j):
     flt = int.from_bytes(fb[j * 2:j * 2 + 2], 'little', signed=True)
-    flt = 1 + flt / (2 ** 15 - 1)
+    flt = flt / (2 ** 15 - 1)
     return flt
 
 

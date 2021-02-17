@@ -137,7 +137,7 @@ def get_loaded_assets(path):
 if __name__ == '__main__':
     # Read dictionary
 
-    map_name = 'I:/maps/season_hub_02e4_fbx/02E4-0799_unreal'
+    map_name = 'I:/maps/ghost_ship_02e2_fbx/02E2-1797_unreal'
     #map_name = 'I:/maps/city_tower_d2_02aa_fbx/02AA-1A83' + '_unreal'
 
     helper = json.load(open(f'{map_name}.txt'))
@@ -145,5 +145,6 @@ if __name__ == '__main__':
     # Test data
     map_path = f'{map_name}.fbx'
     # import_map(map_path, target_import_path='RotTests')
-    assets = get_loaded_assets('HELM')
-    editor_level_lib(assets, helper, start=int(4*len(assets)/8), end=int(8*len(assets)/8), level_name='HELM')
+    assets = get_loaded_assets('ghost_main')
+    editor_level_lib(assets, helper, start=int(7*len(assets)/8), end=int(8*len(assets)/8), level_name='ghost_main')
+    # IF missing we didnt run 6, 7
